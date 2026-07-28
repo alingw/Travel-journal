@@ -219,7 +219,7 @@ function EditorForm({
           <div className="field">
             <label>Day</label>
             <select value={day} onChange={(e) => setDay(e.target.value)}>
-              <option value="">📌 Wishlist</option>
+              <option value="">Wishlist (unscheduled)</option>
               {days.map((d) => (
                 <option key={d} value={d}>
                   {dowLabel(d)} {dayNumLabel(d)}

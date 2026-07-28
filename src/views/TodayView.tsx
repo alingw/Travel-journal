@@ -105,7 +105,7 @@ export function TodayView() {
         </DropZone>
 
         <div className="section-title" style={{ marginTop: 20 }}>
-          📌 Drag in from wishlist
+          Drag in from wishlist
         </div>
         <div className="wish-grid">
           {wishlist.length === 0 && <div className="day-empty">Wishlist is empty.</div>}

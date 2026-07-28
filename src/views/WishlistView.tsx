@@ -19,7 +19,7 @@ export function WishlistView() {
       <SearchAddPanel />
 
       <div>
-        <div className="section-title">📌 Wishlist ({wishlist.length})</div>
+        <div className="section-title">Wishlist ({wishlist.length})</div>
         <div className="tray-hint" style={{ marginBottom: 10 }}>
           Places you might visit. Pick a day to schedule, or drag them from the Journal tab.
         </div>

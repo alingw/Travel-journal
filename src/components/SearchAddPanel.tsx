@@ -122,7 +122,7 @@ function ResultRow({
             ))}
           </select>
           <select value={day} onChange={(e) => setDay(e.target.value)}>
-            <option value="">📌 Wishlist</option>
+            <option value="">Wishlist</option>
             {days.map((d) => (
               <option key={d} value={d}>
                 {dowLabel(d)} {dayNumLabel(d)}

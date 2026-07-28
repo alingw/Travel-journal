@@ -133,7 +133,7 @@ export function JournalView() {
 
         <div className="side-trays">
           <DropZone id={TRAY_ID} className="tray">
-            <h4>📌 Wishlist</h4>
+            <h4>Wishlist</h4>
             <div className="tray-hint">Maybe-visits. Drag onto a day to schedule.</div>
             <div className="tray-list">
               {wishlist.length === 0 && <div className="day-empty">all scheduled! 🎉</div>}
@@ -144,7 +144,7 @@ export function JournalView() {
           </DropZone>
 
           <div className="tray library">
-            <h4>🗂️ All places</h4>
+            <h4>All places</h4>
             <div className="tray-hint">Every place you’ve added. Drag to re-add on any day.</div>
             <div className="tray-list">
               {library.length === 0 && <div className="day-empty">nothing yet</div>}

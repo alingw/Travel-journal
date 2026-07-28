@@ -15,10 +15,10 @@ import { dayNumLabel } from './utils/dates'
 type Tab = 'journal' | 'wishlist' | 'map' | 'today'
 
 const TABS: Array<{ id: Tab; label: string }> = [
-  { id: 'journal', label: '📖 Journal' },
-  { id: 'wishlist', label: '📌 Wishlist' },
-  { id: 'map', label: '🗺️ Map' },
-  { id: 'today', label: '⭐ Today' },
+  { id: 'journal', label: 'Journal' },
+  { id: 'wishlist', label: 'Wishlist' },
+  { id: 'map', label: 'Map' },
+  { id: 'today', label: 'Today' },
 ]
 
 export default function App() {
