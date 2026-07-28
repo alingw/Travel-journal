@@ -41,30 +41,34 @@ Generate new token:
 The app **and** the sync API are served from that one URL (`/` = app,
 `/api/trips` = function), so there's no CORS to configure.
 
-### 5. Connect the app
-Open your Vercel URL → click **☁** (top right) →
-- **Sync service URL:** your Vercel URL (e.g. `https://travel-journal-xyz.vercel.app`)
-- **Owner key:** the same `OWNER_KEY` you set in Vercel
-- Under **Owner tools**, pick a **trip id** (e.g. `us-open-2026`) and a **4-digit code**,
-  then **Publish trip**. You're now editing in cloud mode (look for **☁✓**).
+### 5. Create your first trip
+Open your Vercel URL — you'll land on the **intro page**. The app already knows to
+talk to its own `/api/trips`, so there's nothing to configure. Then:
+- Click **＋ Create a new trip**.
+- Fill in the name / city / dates, choose a **4-digit code**, and enter your
+  **`OWNER_KEY`** (the one you set in Vercel — it's remembered on your device after).
+- **Create & open** → you're in the journal, editing in sync mode (**☁✓**).
 
 ## Sharing & editing
-Give someone: **the app URL + the trip id + the 4-digit code**. They open **☁** →
-enter the trip id + code → **Open & edit**. Every change autosaves to your private
-`travel-data` repo (`☁…` while saving, `☁✓` when synced). If two people edit at once,
-whoever saves second is told and gets the latest version reloaded (no silent loss).
+Give someone **the app URL + the 4-digit code** — that's it. They open the URL,
+type the code on the intro page, and **Open →** straight into the journal. Every
+change autosaves to your private `travel-data` repo (`☁…` saving, `☁✓` synced). If
+two people edit at once, whoever saves second is told and gets the latest reloaded
+(no silent loss).
 
 - **☁✓** synced · **☁…** saving · **☁⚠** another editor saved (reloaded) · **☁!** error
-- **Leave cloud** (in the ☁ panel) returns you to your private on-device trip.
-- Change a trip's code anytime under **Owner tools → List my trips → change code**.
+- The **☁ Trip menu** (top right) shows/copies the code, lists your codes, and
+  **Leave / switch trip** takes you back to the intro page.
+- Only the **owner** (with the owner key) can create trips; everyone else can only
+  open with a code.
 
 ## Testing locally first (optional)
 Run the included mock (no GitHub needed):
 ```bash
 node dev/mock-sync-server.mjs
 ```
-Then set the app's Sync service URL to `http://localhost:8787` and Owner key to
-`test-owner`. Publish/open/edit exactly as above.
+On the intro page → **advanced**, set the Sync URL to `http://localhost:8787`, then
+create a trip using owner key `test-owner`, or open one by its code.
 
 ## Security notes — please read
 - **4-digit codes are weak on purpose** (10,000 combinations). Anyone who has the app

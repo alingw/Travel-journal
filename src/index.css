@@ -57,8 +57,11 @@ button {
   display: flex;
   flex-direction: column;
   height: 100%;
-  max-width: 1100px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  /* Fill the screen, leaving only a small gutter on the left and right. */
+  padding: 0 clamp(12px, 3vw, 56px);
 }
 
 .header {
@@ -588,6 +591,116 @@ select {
 .link {
   color: var(--terra-dk);
   cursor: pointer;
+}
+
+/* ---------- Landing / intro page ---------- */
+.landing {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+.landing-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--paper);
+  border: 2px solid var(--paper-line);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  padding: 26px 24px 20px;
+}
+.landing-brand {
+  text-align: center;
+  margin-bottom: 20px;
+}
+.landing-sticker {
+  font-size: 2.6rem;
+  display: block;
+  line-height: 1;
+}
+.landing-brand h1 {
+  font-family: var(--script);
+  font-weight: 700;
+  font-size: 2.6rem;
+  margin: 4px 0 0;
+  color: var(--ink);
+}
+.landing-tag {
+  font-family: var(--hand);
+  color: var(--ink-soft);
+  font-size: 1rem;
+}
+.landing-section {
+  margin-top: 6px;
+}
+.landing-section > label {
+  display: block;
+  font-family: var(--script);
+  font-size: 1.4rem;
+  color: var(--terra-dk);
+  margin-bottom: 6px;
+}
+.landing-row {
+  display: flex;
+  gap: 8px;
+}
+.code-input {
+  flex: 1;
+  font-family: var(--script);
+  font-weight: 700;
+  font-size: 2rem;
+  letter-spacing: 0.4em;
+  text-align: center;
+  padding: 6px 10px;
+  border-radius: 12px;
+  border: 2px solid var(--paper-line);
+  background: #fffdf6;
+  color: var(--ink);
+}
+.code-input:focus {
+  outline: none;
+  border-color: var(--terra);
+}
+.code-input.sm {
+  font-size: 1.2rem;
+  letter-spacing: 0.2em;
+  padding: 6px;
+}
+.landing-hint {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  margin-top: 6px;
+}
+.landing-or {
+  text-align: center;
+  color: var(--ink-soft);
+  font-family: var(--script);
+  font-size: 1.2rem;
+  margin: 16px 0;
+}
+.landing-create {
+  width: 100%;
+}
+.landing-foot {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 0.85rem;
+}
+
+/* Shared code display (trip menu) */
+.code-box {
+  background: #fbf6e9;
+  border: 1.5px solid var(--paper-line);
+  border-radius: 12px;
+  padding: 12px;
+}
+.code-big {
+  font-family: var(--script);
+  font-weight: 700;
+  font-size: 2.6rem;
+  letter-spacing: 0.3em;
+  text-align: center;
+  color: var(--terra-dk);
 }
 
 /* ---------- Add-stop button (journal / today) ---------- */

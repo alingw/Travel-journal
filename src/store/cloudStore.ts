@@ -1,9 +1,9 @@
-// Cloud session state: which trip is open from GitHub, its 4-digit code, and the
-// autosave lifecycle. Data flows through tripStore (enterCloud/exitCloud); this
-// store just orchestrates open / publish / save + status.
+// Cloud session state: which trip (by 4-digit code) is open from GitHub, plus the
+// autosave lifecycle. Data flows through tripStore (enterCloud/exitCloud).
 
 import { create } from 'zustand'
 import { useTrip } from './tripStore'
+import type { Trip, Place } from '../types'
 import * as cloud from '../services/cloud'
 
 const SESSION_KEY = 'tjp.cloudSession'
@@ -11,7 +11,6 @@ const SESSION_KEY = 'tjp.cloudSession'
 type Status = 'idle' | 'loading' | 'saving' | 'saved' | 'error' | 'conflict'
 
 interface Session {
-  tripId: string
   code: string
   sha: string
 }
@@ -20,8 +19,8 @@ interface CloudState {
   session: Session | null
   status: Status
   message: string
-  open: (tripId: string, code: string) => Promise<void>
-  publish: (ownerKey: string, tripId: string, code: string) => Promise<void>
+  open: (code: string) => Promise<void>
+  create: (ownerKey: string, code: string, trip: Trip, places: Place[]) => Promise<void>
   leave: () => void
   scheduleSave: () => void
   saveNow: () => Promise<void>
@@ -47,11 +46,11 @@ function readPersisted(): Session | null {
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 
-// True while we apply data pulled FROM the cloud, so the autosave subscription
-// in App can ignore those store changes (they aren't user edits).
+// True while we apply data pulled FROM the cloud, so the autosave subscription in
+// App can ignore those store changes (they aren't user edits).
 let applyingRemote = false
 export const isApplyingRemote = () => applyingRemote
-function applyRemote(trip: any, places: any) {
+function applyRemote(trip: Trip, places: Place[]) {
   applyingRemote = true
   try {
     useTrip.getState().enterCloud(trip, places)
@@ -65,12 +64,12 @@ export const useCloud = create<CloudState>((set, get) => ({
   status: 'idle',
   message: '',
 
-  async open(tripId, code) {
+  async open(code) {
     set({ status: 'loading', message: 'opening…' })
     try {
-      const res = await cloud.openTrip(tripId, code)
+      const res = await cloud.openTrip(code)
       applyRemote(res.trip, res.places)
-      const session = { tripId, code, sha: res.sha }
+      const session = { code, sha: res.sha }
       set({ session, status: 'saved', message: 'synced' })
       persist(session)
     } catch (e: any) {
@@ -79,19 +78,16 @@ export const useCloud = create<CloudState>((set, get) => ({
     }
   },
 
-  async publish(ownerKey, tripId, code) {
-    const { trip, places } = useTrip.getState()
-    if (!trip) throw new Error('No trip to publish')
-    set({ status: 'saving', message: 'publishing…' })
+  async create(ownerKey, code, trip, places) {
+    set({ status: 'saving', message: 'creating…' })
     try {
-      const res = await cloud.createTrip(ownerKey, tripId, code, { ...trip, id: tripId }, places)
-      // Continue editing this trip in cloud mode so further edits sync.
-      applyRemote({ ...trip, id: tripId }, places)
-      const session = { tripId, code, sha: res.sha }
-      set({ session, status: 'saved', message: 'published & synced' })
+      const res = await cloud.createTrip(ownerKey, code, trip, places)
+      applyRemote(trip, places)
+      const session = { code, sha: res.sha }
+      set({ session, status: 'saved', message: 'created & synced' })
       persist(session)
     } catch (e: any) {
-      set({ status: 'error', message: e?.message ?? 'could not publish' })
+      set({ status: 'error', message: e?.message ?? 'could not create' })
       throw e
     }
   },
@@ -121,7 +117,7 @@ export const useCloud = create<CloudState>((set, get) => ({
     const { trip, places } = useTrip.getState()
     if (!trip) return
     try {
-      const res = await cloud.saveTrip(session.tripId, session.code, trip, places, session.sha)
+      const res = await cloud.saveTrip(session.code, trip, places, session.sha)
       const next = { ...session, sha: res.sha }
       set({ session: next, status: 'saved', message: 'synced' })
       persist(next)
@@ -131,11 +127,7 @@ export const useCloud = create<CloudState>((set, get) => ({
         const latest = e.payload.latest
         applyRemote(latest.trip, latest.places)
         const next = { ...session, sha: latest.sha }
-        set({
-          session: next,
-          status: 'conflict',
-          message: 'another editor saved — reloaded their version',
-        })
+        set({ session: next, status: 'conflict', message: 'another editor saved — reloaded theirs' })
         persist(next)
       } else {
         set({ status: 'error', message: e?.message ?? 'save failed' })
@@ -145,11 +137,10 @@ export const useCloud = create<CloudState>((set, get) => ({
 
   async resume() {
     const persisted = readPersisted()
-    if (!persisted || !cloud.cloudConfigured()) return
+    if (!persisted) return
     try {
-      await get().open(persisted.tripId, persisted.code)
+      await get().open(persisted.code)
     } catch {
-      // Code/trip no longer valid — drop the stale session silently.
       persist(null)
       set({ session: null, status: 'idle', message: '' })
     }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useTrip } from './store/tripStore'
 import { JournalView } from './views/JournalView'
@@ -7,6 +7,7 @@ import { MapView } from './views/MapView'
 import { TodayView } from './views/TodayView'
 import { PlaceEditor } from './components/PlaceEditor'
 import { CloudPanel } from './components/CloudPanel'
+import { Landing } from './components/Landing'
 import { useEditor } from './store/editorStore'
 import { useCloud, isApplyingRemote } from './store/cloudStore'
 import { dayNumLabel } from './utils/dates'
@@ -25,19 +26,16 @@ export default function App() {
   const loaded = useTrip((s) => s.loaded)
   const trip = useTrip((s) => s.trip)
   const exportJSON = useTrip((s) => s.exportJSON)
-  const importJSON = useTrip((s) => s.importJSON)
   const [tab, setTab] = useState<Tab>('journal')
   const [cloudOpen, setCloudOpen] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
   const openEditor = useEditor((s) => s.openEditor)
-  const cloudMode = useTrip((s) => s.cloudMode)
   const cloudStatus = useCloud((s) => s.status)
 
   useEffect(() => {
     init()
-    // Resume a cloud session if one was open before reload.
+    // Resume an open trip if one was active before reload.
     useCloud.getState().resume()
-    // Autosave: push local edits to the cloud while a cloud trip is active.
+    // Autosave: push edits to the cloud while a trip is active.
     const unsub = useTrip.subscribe((state, prev) => {
       if (!state.cloudMode || isApplyingRemote()) return
       if (state.places !== prev.places || state.trip !== prev.trip) {
@@ -57,31 +55,24 @@ export default function App() {
     URL.revokeObjectURL(url)
   }
 
-  async function doImport(file: File) {
-    try {
-      await importJSON(await file.text())
-    } catch (e: any) {
-      alert('Could not import: ' + (e?.message ?? 'invalid file'))
-    }
-  }
-
-  if (!loaded) return <div className="center-msg">opening the journal…</div>
-  if (!trip) return <div className="center-msg">no trip yet</div>
+  if (!loaded) return <div className="center-msg">loading…</div>
+  if (!trip) return <Landing />
 
   return (
     <div className="app">
       <header className="header">
         <h1>{trip.name}</h1>
         <div className="sub">
-          {trip.baseCity} · {dayNumLabel(trip.startDate)} – {dayNumLabel(trip.endDate)}
+          {trip.baseCity ? `${trip.baseCity} · ` : ''}
+          {dayNumLabel(trip.startDate)} – {dayNumLabel(trip.endDate)}
         </div>
         <div className="tools">
           <button
             className="icon-btn"
-            title={cloudMode ? `Cloud: ${cloudStatus}` : 'Cloud sync (share/edit via GitHub)'}
+            title={`Trip menu · ${cloudStatus}`}
             onClick={() => setCloudOpen(true)}
           >
-            {cloudMode ? cloudBadge(cloudStatus) : '☁'}
+            {cloudBadge(cloudStatus)}
           </button>
           <button className="icon-btn" title="Add a stop / event" onClick={() => openEditor()}>
             ＋
@@ -89,20 +80,6 @@ export default function App() {
           <button className="icon-btn" title="Export trip (JSON backup)" onClick={doExport}>
             ⬇
           </button>
-          <button
-            className="icon-btn"
-            title="Import trip"
-            onClick={() => fileRef.current?.click()}
-          >
-            ⬆
-          </button>
-          <input
-            ref={fileRef}
-            className="hidden-file"
-            type="file"
-            accept="application/json"
-            onChange={(e) => e.target.files?.[0] && doImport(e.target.files[0])}
-          />
         </div>
       </header>
 
@@ -141,7 +118,7 @@ export default function App() {
   )
 }
 
-// Small status glyph for the cloud button when a cloud trip is active.
+// Status glyph for the trip menu button.
 function cloudBadge(status: string): string {
   switch (status) {
     case 'saving':

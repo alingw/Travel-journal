@@ -4,7 +4,6 @@
 import { create } from 'zustand'
 import type { Place, Trip, Category, PlaceStatus } from '../types'
 import { db } from './db'
-import { SEED_TRIP, seedPlaces } from './seed'
 import { resolveStickerId } from '../services/stickers'
 
 const uid = () =>
@@ -87,18 +86,10 @@ export const useTrip = create<TripState>((set, get) => ({
   cloudMode: false,
 
   async init() {
+    // No local seed anymore: the app opens on the landing page until a trip is
+    // opened by code or created. Trips live in the cloud (keyed by their code).
     if (get().loaded) return
-    let trip = await db.trips.get(SEED_TRIP.id)
-    let allPlaces = await db.places.toArray()
-    // First run (or empty db): seed the example trip.
-    if (!trip && allPlaces.length === 0) {
-      trip = SEED_TRIP
-      allPlaces = seedPlaces(SEED_TRIP.id)
-      await db.trips.put(trip)
-      await db.places.bulkPut(allPlaces)
-    }
-    if (!trip) trip = (await db.trips.toArray())[0] ?? null
-    set({ trip: trip ?? null, places: allPlaces, loaded: true })
+    set({ loaded: true })
   },
 
   async addPlace(input) {

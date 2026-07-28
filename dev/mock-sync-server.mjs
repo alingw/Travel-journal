@@ -1,14 +1,12 @@
-// Local mock of the /api/trips serverless function — for testing cloud sync
-// WITHOUT GitHub. Stores trips in memory. Run:  node dev/mock-sync-server.mjs
-// Then set the app's "Sync service URL" to http://localhost:8787
+// Local mock of /api/trips (code-keyed model) — test cloud sync WITHOUT GitHub.
+// Run:  node dev/mock-sync-server.mjs
+// Then in the app's landing → advanced, set Sync URL to http://localhost:8787
 import http from 'node:http'
 import crypto from 'node:crypto'
 
 const PORT = 8787
 const OWNER_KEY = 'test-owner'
-const store = new Map() // tripId -> { name, salt, codeHash, trip, places, sha }
-
-const hash = (code, salt) => crypto.createHash('sha256').update(`${salt}:${code}`).digest('hex')
+const store = new Map() // code -> { name, trip, places, sha }
 const newSha = () => crypto.randomBytes(8).toString('hex')
 
 function send(res, status, obj) {
@@ -33,44 +31,33 @@ http
       } catch {
         return send(res, 400, { ok: false, error: 'bad json' })
       }
-      const { action } = b
       const owner = (k) => k === OWNER_KEY
-      if (action === 'open') {
-        const f = store.get(b.tripId)
-        if (!f) return send(res, 404, { ok: false, error: 'not found' })
-        if (f.codeHash !== hash(b.code, f.salt)) return send(res, 403, { ok: false, error: 'wrong code' })
+      if (b.action === 'open') {
+        const f = store.get(b.code)
+        if (!f) return send(res, 404, { ok: false, error: 'no trip with that code' })
         return send(res, 200, { ok: true, name: f.name, trip: f.trip, places: f.places, sha: f.sha })
       }
-      if (action === 'save') {
-        const f = store.get(b.tripId)
+      if (b.action === 'save') {
+        const f = store.get(b.code)
         if (!f) return send(res, 404, { ok: false, error: 'not found' })
-        if (f.codeHash !== hash(b.code, f.salt)) return send(res, 403, { ok: false, error: 'wrong code' })
         if (b.sha && b.sha !== f.sha)
           return send(res, 409, { ok: false, error: 'conflict', latest: { trip: f.trip, places: f.places, sha: f.sha } })
         f.trip = b.trip
         f.places = b.places
+        f.name = b.trip?.name ?? f.name
         f.sha = newSha()
         return send(res, 200, { ok: true, sha: f.sha })
       }
-      if (action === 'create') {
+      if (b.action === 'create') {
         if (!owner(b.ownerKey)) return send(res, 403, { ok: false, error: 'owner only' })
-        if (store.has(b.tripId)) return send(res, 409, { ok: false, error: 'already exists' })
-        const salt = crypto.randomBytes(8).toString('hex')
+        if (store.has(b.code)) return send(res, 409, { ok: false, error: 'code already in use' })
         const sha = newSha()
-        store.set(b.tripId, { name: b.trip?.name ?? b.tripId, salt, codeHash: hash(b.code, salt), trip: b.trip, places: b.places ?? [], sha })
+        store.set(b.code, { name: b.trip?.name ?? b.code, trip: b.trip, places: b.places ?? [], sha })
         return send(res, 200, { ok: true, sha })
       }
-      if (action === 'list') {
+      if (b.action === 'list') {
         if (!owner(b.ownerKey)) return send(res, 403, { ok: false, error: 'owner only' })
         return send(res, 200, { ok: true, trips: [...store.keys()] })
-      }
-      if (action === 'setcode') {
-        if (!owner(b.ownerKey)) return send(res, 403, { ok: false, error: 'owner only' })
-        const f = store.get(b.tripId)
-        if (!f) return send(res, 404, { ok: false, error: 'not found' })
-        f.salt = crypto.randomBytes(8).toString('hex')
-        f.codeHash = hash(b.code, f.salt)
-        return send(res, 200, { ok: true })
       }
       return send(res, 400, { ok: false, error: 'unknown action' })
     })

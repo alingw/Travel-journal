@@ -1,21 +1,27 @@
 // Client wrapper for the serverless sync API (see api/trips.ts).
-// The API base URL + owner key live in localStorage (owner key only on your device).
+// Trips are addressed purely by their 4-digit code. The API base defaults to the
+// app's own origin (so a deployed visitor needs zero setup); it can be overridden
+// in localStorage for local dev / pointing at a mock.
 
 import type { Trip, Place } from '../types'
 
 const API_KEY = 'tjp.cloudApi'
 const OWNER_KEY = 'tjp.ownerKey'
 
+/** Base URL of the sync API. Falls back to the current origin when unset. */
 export function getCloudApi(): string {
   try {
-    return localStorage.getItem(API_KEY) ?? ''
+    const stored = localStorage.getItem(API_KEY)
+    if (stored && stored.trim()) return stored.replace(/\/$/, '')
   } catch {
-    return ''
+    /* ignore */
   }
+  return typeof window !== 'undefined' ? window.location.origin : ''
 }
 export function setCloudApi(url: string) {
   try {
-    localStorage.setItem(API_KEY, url.replace(/\/$/, ''))
+    if (url.trim()) localStorage.setItem(API_KEY, url.replace(/\/$/, ''))
+    else localStorage.removeItem(API_KEY)
   } catch {
     /* ignore */
   }
@@ -35,10 +41,6 @@ export function setOwnerKey(k: string) {
   }
 }
 
-export function cloudConfigured(): boolean {
-  return getCloudApi().length > 0
-}
-
 export interface CloudTrip {
   name: string
   trip: Trip
@@ -47,9 +49,7 @@ export interface CloudTrip {
 }
 
 async function call<T = any>(payload: Record<string, unknown>): Promise<T> {
-  const base = getCloudApi()
-  if (!base) throw new Error('Cloud API URL not set')
-  const res = await fetch(`${base}/api/trips`, {
+  const res = await fetch(`${getCloudApi()}/api/trips`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -64,38 +64,28 @@ async function call<T = any>(payload: Record<string, unknown>): Promise<T> {
   return data as T
 }
 
-export function openTrip(tripId: string, code: string): Promise<CloudTrip> {
-  return call<CloudTrip & { ok: true }>({ action: 'open', tripId, code })
+export function openTrip(code: string): Promise<CloudTrip> {
+  return call<CloudTrip & { ok: true }>({ action: 'open', code })
 }
 
 export function saveTrip(
-  tripId: string,
   code: string,
   trip: Trip,
   places: Place[],
   sha: string,
 ): Promise<{ ok: true; sha: string }> {
-  return call({ action: 'save', tripId, code, trip, places, sha })
+  return call({ action: 'save', code, trip, places, sha })
 }
 
 export function createTrip(
   ownerKey: string,
-  tripId: string,
   code: string,
   trip: Trip,
   places: Place[],
 ): Promise<{ ok: true; sha: string }> {
-  return call({ action: 'create', ownerKey, tripId, code, trip, places })
+  return call({ action: 'create', ownerKey, code, trip, places })
 }
 
 export function listTrips(ownerKey: string): Promise<{ ok: true; trips: string[] }> {
   return call({ action: 'list', ownerKey })
-}
-
-export function setTripCode(
-  ownerKey: string,
-  tripId: string,
-  code: string,
-): Promise<{ ok: true }> {
-  return call({ action: 'setcode', ownerKey, tripId, code })
 }
