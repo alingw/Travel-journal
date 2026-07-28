@@ -17,6 +17,7 @@
   --hand: 'Patrick Hand', 'Comic Sans MS', cursive;
   --script: 'Caveat', cursive;
   --marker: var(--script); /* legacy alias → title font */
+  --place-font: 'Montserrat', 'Helvetica Neue', Arial, sans-serif; /* place names */
 }
 
 * {
@@ -169,7 +170,7 @@ button {
   min-width: 0;
 }
 .place-card .title {
-  font-family: var(--marker);
+  font-family: var(--place-font);
   font-size: 1.15rem;
   line-height: 1.05;
   color: var(--ink);
@@ -373,7 +374,7 @@ button {
   box-shadow: 0 16px 34px rgba(60, 45, 25, 0.34);
 }
 .pin-chip .title {
-  font-family: var(--marker);
+  font-family: var(--place-font);
   font-size: 1rem;
   line-height: 1;
 }
@@ -483,7 +484,7 @@ select {
   height: 74%;
 }
 .map-label {
-  font-family: var(--script);
+  font-family: var(--place-font);
   font-size: 1rem;
   font-weight: 700;
   color: var(--ink);
