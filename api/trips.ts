@@ -34,6 +34,12 @@ function validCode(code: unknown): code is string {
   return typeof code === 'string' && /^\d{4}$/.test(code)
 }
 
+// Only needed to recognise trips saved under the OLD format (name-keyed, with a
+// salted code hash) so we can migrate them to the new code-keyed format on open.
+function hashCode(code: string, salt: string): string {
+  return crypto.createHash('sha256').update(`${salt}:${code}`).digest('hex')
+}
+
 async function gh(path: string, init?: RequestInit) {
   return fetch(`${GH}${path}`, {
     ...init,
@@ -77,6 +83,38 @@ async function writeFile(code: string, data: any, sha: string | undefined, messa
   return json.content.sha as string
 }
 
+async function deleteFile(key: string, sha: string, message: string) {
+  const res = await gh(`/repos/${env('DATA_REPO')}/contents/${filePath(key)}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ message, sha }),
+  })
+  if (!res.ok && res.status !== 404) throw new Error(`GitHub delete failed (${res.status})`)
+}
+
+// Scan for a trip stored in the OLD name-keyed format whose salted codeHash
+// matches `code`, so `open` can migrate it to the new code-keyed format.
+async function findLegacyByCode(
+  code: string,
+): Promise<{ key: string; data: any; sha: string } | null> {
+  const r = await gh(`/repos/${env('DATA_REPO')}/contents/trips`)
+  if (!r.ok) return null
+  const arr = (await r.json()) as any[]
+  for (const f of arr) {
+    if (!f.name?.endsWith('.json')) continue
+    const key = f.name.replace(/\.json$/, '')
+    if (key === code) continue
+    const file = await readFile(key)
+    if (
+      file?.data?.codeHash &&
+      file.data.salt &&
+      hashCode(code, file.data.salt) === file.data.codeHash
+    ) {
+      return { key, data: file.data, sha: file.sha }
+    }
+  }
+  return null
+}
+
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', process.env.ALLOW_ORIGIN || '*')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
@@ -103,7 +141,28 @@ export default async function handler(req: any, res: any) {
         const { code } = body
         if (!validCode(code)) return res.status(400).json({ ok: false, error: 'bad code' })
         const file = await readFile(code)
-        if (!file) return res.status(404).json({ ok: false, error: 'no trip with that code' })
+        if (!file) {
+          // Backward-compat: migrate an old-format trip to the new code key on first open.
+          const legacy = await findLegacyByCode(code)
+          if (legacy) {
+            const migrated = {
+              v: 1,
+              name: legacy.data.name ?? code,
+              trip: legacy.data.trip,
+              places: legacy.data.places ?? [],
+            }
+            const newSha = await writeFile(code, migrated, undefined, `Migrate ${legacy.key} -> ${code}`)
+            await deleteFile(legacy.key, legacy.sha, `Remove legacy ${legacy.key}`).catch(() => {})
+            return res.status(200).json({
+              ok: true,
+              name: migrated.name,
+              trip: migrated.trip,
+              places: migrated.places,
+              sha: newSha,
+            })
+          }
+          return res.status(404).json({ ok: false, error: 'no trip with that code' })
+        }
         return res.status(200).json({
           ok: true,
           name: file.data.name,

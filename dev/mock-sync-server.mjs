@@ -6,8 +6,25 @@ import crypto from 'node:crypto'
 
 const PORT = 8787
 const OWNER_KEY = 'test-owner'
-const store = new Map() // code -> { name, trip, places, sha }
+const store = new Map() // code (or legacy name) -> { name, trip, places, sha, legacy? }
 const newSha = () => crypto.randomBytes(8).toString('hex')
+const hashCode = (code, salt) => crypto.createHash('sha256').update(`${salt}:${code}`).digest('hex')
+
+// Pre-seed one OLD-format trip (name-keyed, hashed code) to test migration on open.
+;(() => {
+  const salt = 'testsalt'
+  store.set('legacy-us-open', {
+    legacy: true,
+    name: 'Legacy US Open',
+    salt,
+    codeHash: hashCode('7777', salt),
+    trip: { id: 'legacy-us-open', name: 'Legacy US Open', baseCity: 'New York', startDate: '2026-08-23', endDate: '2026-08-27' },
+    places: [
+      { id: 'lg1', tripId: 'legacy-us-open', name: 'Legacy Stop', category: 'sight', status: 'wishlist', stickerId: 'landmark' },
+    ],
+    sha: newSha(),
+  })
+})()
 
 function send(res, status, obj) {
   res.writeHead(status, {
@@ -33,9 +50,19 @@ http
       }
       const owner = (k) => k === OWNER_KEY
       if (b.action === 'open') {
-        const f = store.get(b.code)
-        if (!f) return send(res, 404, { ok: false, error: 'no trip with that code' })
-        return send(res, 200, { ok: true, name: f.name, trip: f.trip, places: f.places, sha: f.sha })
+        const direct = store.get(b.code)
+        if (direct && !direct.legacy)
+          return send(res, 200, { ok: true, name: direct.name, trip: direct.trip, places: direct.places, sha: direct.sha })
+        // Backward-compat: find + migrate an old-format trip by its code.
+        for (const [key, v] of store) {
+          if (v.legacy && v.salt && hashCode(b.code, v.salt) === v.codeHash) {
+            const migrated = { name: v.name, trip: v.trip, places: v.places, sha: newSha() }
+            store.delete(key)
+            store.set(b.code, migrated)
+            return send(res, 200, { ok: true, ...migrated })
+          }
+        }
+        return send(res, 404, { ok: false, error: 'no trip with that code' })
       }
       if (b.action === 'save') {
         const f = store.get(b.code)

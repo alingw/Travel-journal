@@ -807,6 +807,26 @@ select {
   color: var(--green);
   margin-top: 4px;
 }
+.blurb-preview {
+  font-size: 0.9rem;
+  color: var(--ink);
+  background: #00000006;
+  border-radius: 8px;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+}
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  margin-top: 8px;
+  cursor: pointer;
+}
+.checkbox-row input {
+  width: auto;
+}
 .search-results {
   margin-top: 6px;
   max-height: 240px;

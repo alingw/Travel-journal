@@ -6,6 +6,7 @@ import { searchPlaces, type GeoResult } from '../services/geocode'
 import { fetchPlaceInfo } from '../services/placeInfo'
 import { resolveStickerId } from '../services/stickers'
 import { Sticker } from './Sticker'
+import { getAutoInfo, setAutoInfo } from '../utils/settings'
 import { dowLabel, dayNumLabel } from '../utils/dates'
 
 // Thin wrapper: only mounts the form when open, and keys it to the place being
@@ -71,6 +72,7 @@ function EditorForm({
   const [results, setResults] = useState<GeoResult[]>([])
   const [searching, setSearching] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [autoInfo, setAutoInfoState] = useState(getAutoInfo())
 
   useEffect(() => {
     const query = q.trim()
@@ -98,7 +100,8 @@ function EditorForm({
     setLoc({ lat: r.lat, lng: r.lng, address: r.address })
     setQ('')
     setResults([])
-    // Enrich with a blurb/photo in the background.
+    // Optionally enrich with a web blurb/photo (off if the user disabled it).
+    if (!getAutoInfo()) return
     const info = await fetchPlaceInfo(r.name)
     setLoc((prev) => ({ ...prev, blurb: info.blurb, photoUrl: info.photoUrl }))
   }
@@ -179,6 +182,17 @@ function EditorForm({
               ))}
             </div>
           )}
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={autoInfo}
+              onChange={(e) => {
+                setAutoInfo(e.target.checked)
+                setAutoInfoState(e.target.checked)
+              }}
+            />
+            add a web description &amp; photo
+          </label>
         </div>
 
         <div className="field">
@@ -234,6 +248,30 @@ function EditorForm({
             <span className="link" onClick={() => setLoc({})}>
               (clear location)
             </span>
+          </div>
+        )}
+
+        {loc.blurb && (
+          <div className="field">
+            <label>Description (auto-added from the web)</label>
+            <div className="blurb-preview">
+              {loc.blurb.length > 160 ? loc.blurb.slice(0, 160).trimEnd() + '…' : loc.blurb}
+            </div>
+            <span className="link" onClick={() => setLoc((p) => ({ ...p, blurb: undefined }))}>
+              ✕ remove description
+            </span>
+          </div>
+        )}
+
+        {loc.photoUrl && (
+          <div className="field">
+            <label>Photo</label>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <img className="thumb" src={loc.photoUrl} alt="" style={{ maxHeight: 70, width: 'auto' }} />
+              <span className="link" onClick={() => setLoc((p) => ({ ...p, photoUrl: undefined }))}>
+                ✕ remove photo
+              </span>
+            </div>
           </div>
         )}
 

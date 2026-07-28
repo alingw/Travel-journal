@@ -5,6 +5,7 @@ import { useTrip, tripDays } from '../store/tripStore'
 import { CATEGORY_LABELS, type Category } from '../types'
 import { Sticker } from './Sticker'
 import { resolveStickerId } from '../services/stickers'
+import { getAutoInfo } from '../utils/settings'
 import { dowLabel, dayNumLabel } from '../utils/dates'
 
 // Search the internet for a place, enrich it, and add it to the wishlist or a day.
@@ -63,7 +64,9 @@ export function SearchAddPanel() {
             days={days}
             added={!!added[keyOf(r)]}
             onAdd={async (category, day) => {
-              const info = await fetchPlaceInfo(r.name)
+              const info: { blurb?: string; photoUrl?: string } = getAutoInfo()
+                ? await fetchPlaceInfo(r.name)
+                : {}
               await addPlace({
                 name: r.name,
                 category,
