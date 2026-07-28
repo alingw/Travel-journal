@@ -1,0 +1,15 @@
+# dependencies & build output (never commit these)
+node_modules
+dist
+dev-dist
+.vite
+*.tsbuildinfo
+
+# deploy / secrets
+.vercel
+.env
+.env.*
+
+# os
+.DS_Store
+Thumbs.db
