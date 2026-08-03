@@ -8,7 +8,7 @@
 // schema via structured outputs so the response is always valid to parse.
 
 const ANTHROPIC = 'https://api.anthropic.com/v1/messages'
-const MODEL = 'claude-opus-5'
+const MODEL = 'claude-sonnet-5'
 
 const SCHEMA = {
   type: 'object',
