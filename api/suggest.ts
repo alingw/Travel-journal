@@ -9,6 +9,57 @@
 
 const ANTHROPIC = 'https://api.anthropic.com/v1/messages'
 const MODEL = 'claude-sonnet-5'
+const GH = 'https://api.github.com'
+
+// ---- daily usage cap (stored as a counter file in the private data repo) ----
+function ghHeaders(token: string) {
+  return {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'travel-journal-suggest',
+    'X-GitHub-Api-Version': '2022-11-28',
+  }
+}
+async function ghGet(repo: string, token: string, path: string) {
+  const res = await fetch(`${GH}/repos/${repo}/contents/${path}`, { headers: ghHeaders(token) })
+  if (!res.ok) return null // 404 or error → treat as no counter yet
+  const j = await res.json()
+  try {
+    return { data: JSON.parse(Buffer.from(j.content, 'base64').toString('utf8')), sha: j.sha as string }
+  } catch {
+    return { data: {}, sha: j.sha as string }
+  }
+}
+async function ghPut(repo: string, token: string, path: string, obj: any, sha?: string) {
+  const body: any = { message: `suggest usage`, content: Buffer.from(JSON.stringify(obj)).toString('base64') }
+  if (sha) body.sha = sha
+  const res = await fetch(`${GH}/repos/${repo}/contents/${path}`, {
+    method: 'PUT',
+    headers: ghHeaders(token),
+    body: JSON.stringify(body),
+  })
+  return { ok: res.ok, status: res.status }
+}
+
+// Returns false when today's cap is already reached; otherwise reserves one slot.
+async function withinDailyLimit(): Promise<boolean> {
+  const repo = process.env.DATA_REPO
+  const token = process.env.GITHUB_TOKEN
+  const limit = parseInt(process.env.SUGGEST_DAILY_LIMIT || '5', 10)
+  // No data repo configured, or limit disabled → don't rate-limit.
+  if (!repo || !token || !(limit > 0)) return true
+  const date = new Date().toISOString().slice(0, 10) // UTC day
+  const path = `usage/suggest-${date}.json`
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const cur = await ghGet(repo, token, path)
+    const count: number = cur?.data?.count ?? 0
+    if (count >= limit) return false
+    const put = await ghPut(repo, token, path, { date, count: count + 1 }, cur?.sha)
+    if (put.ok || put.status !== 409) return true // reserved (or a non-conflict write error → don't block)
+    // 409 conflict (a concurrent call incremented first) → re-read and retry
+  }
+  return true // gave up retrying under contention → allow rather than block a real request
+}
 
 const SCHEMA = {
   type: 'object',
@@ -73,6 +124,14 @@ export default async function handler(req: any, res: any) {
   const { trip, places, days } = body || {}
   if (!trip || !Array.isArray(places) || !Array.isArray(days))
     return res.status(400).json({ ok: false, error: 'bad params' })
+
+  // Enforce the daily usage cap before spending any tokens.
+  const limit = parseInt(process.env.SUGGEST_DAILY_LIMIT || '5', 10)
+  if (!(await withinDailyLimit()))
+    return res.status(429).json({
+      ok: false,
+      error: `Daily AI limit reached (${limit} per day). It resets at UTC midnight.`,
+    })
 
   // Trim the payload to what the planner needs.
   const slimPlaces = places.map((p: any) => ({

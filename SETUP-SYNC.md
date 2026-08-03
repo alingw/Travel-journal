@@ -37,6 +37,7 @@ Generate new token:
   | `DATA_REPO` | `your-username/travel-data` |
   | `OWNER_KEY` | a long random secret you invent (your admin password) |
   | `ANTHROPIC_API_KEY` | *(optional)* your Anthropic API key — only needed for the **✦ Suggest a schedule** AI button; costs a few cents per suggestion |
+  | `SUGGEST_DAILY_LIMIT` | *(optional)* max AI suggestions per day (default **5**). The count is stored in your data repo (`usage/suggest-<date>.json`) and resets at UTC midnight. Set to `0` to disable the cap. |
 - Deploy. You'll get a URL like `https://travel-journal-xyz.vercel.app`.
 
 The app **and** the sync API are served from that one URL (`/` = app,

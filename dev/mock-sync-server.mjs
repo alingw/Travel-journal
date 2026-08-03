@@ -9,6 +9,8 @@ const OWNER_KEY = 'test-owner'
 const store = new Map() // code (or legacy name) -> { name, trip, places, sha, legacy? }
 const newSha = () => crypto.randomBytes(8).toString('hex')
 const hashCode = (code, salt) => crypto.createHash('sha256').update(`${salt}:${code}`).digest('hex')
+const MOCK_SUGGEST_LIMIT = 3 // for testing the daily-cap 429 path
+let mockSuggestCount = 0
 
 // Pre-seed one OLD-format trip (name-keyed, hashed code) to test migration on open.
 ;(() => {
@@ -50,6 +52,9 @@ http
       }
       // Canned AI suggestion (no real LLM) so the client flow can be tested.
       if ((req.url || '').includes('/api/suggest')) {
+        mockSuggestCount++
+        if (mockSuggestCount > MOCK_SUGGEST_LIMIT)
+          return send(res, 429, { ok: false, error: `Daily AI limit reached (${MOCK_SUGGEST_LIMIT} per day). It resets at UTC midnight.` })
         const days = b.days || []
         const assignments = (b.places || []).map((p, i) => ({
           placeId: p.id,
