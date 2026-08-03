@@ -36,6 +36,7 @@ Generate new token:
   | `GITHUB_TOKEN` | the fine-grained token from step 3 |
   | `DATA_REPO` | `your-username/travel-data` |
   | `OWNER_KEY` | a long random secret you invent (your admin password) |
+  | `ANTHROPIC_API_KEY` | *(optional)* your Anthropic API key — only needed for the **✦ Suggest a schedule** AI button; costs a few cents per suggestion |
 - Deploy. You'll get a URL like `https://travel-journal-xyz.vercel.app`.
 
 The app **and** the sync API are served from that one URL (`/` = app,

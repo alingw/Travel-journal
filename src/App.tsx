@@ -7,6 +7,7 @@ import { MapView } from './views/MapView'
 import { TodayView } from './views/TodayView'
 import { PlaceEditor } from './components/PlaceEditor'
 import { CloudPanel } from './components/CloudPanel'
+import { SuggestPanel } from './components/SuggestPanel'
 import { Landing } from './components/Landing'
 import { useEditor } from './store/editorStore'
 import { useCloud, isApplyingRemote } from './store/cloudStore'
@@ -28,6 +29,7 @@ export default function App() {
   const exportJSON = useTrip((s) => s.exportJSON)
   const [tab, setTab] = useState<Tab>('journal')
   const [cloudOpen, setCloudOpen] = useState(false)
+  const [suggestOpen, setSuggestOpen] = useState(false)
   const openEditor = useEditor((s) => s.openEditor)
   const cloudStatus = useCloud((s) => s.status)
 
@@ -74,6 +76,13 @@ export default function App() {
           >
             {cloudBadge(cloudStatus)}
           </button>
+          <button
+            className="icon-btn"
+            title="Suggest a schedule (AI)"
+            onClick={() => setSuggestOpen(true)}
+          >
+            ✦
+          </button>
           <button className="icon-btn" title="Add a stop / event" onClick={() => openEditor()}>
             ＋
           </button>
@@ -114,6 +123,7 @@ export default function App() {
 
       <PlaceEditor />
       {cloudOpen && <CloudPanel onClose={() => setCloudOpen(false)} />}
+      {suggestOpen && <SuggestPanel onClose={() => setSuggestOpen(false)} />}
     </div>
   )
 }

@@ -48,6 +48,21 @@ http
       } catch {
         return send(res, 400, { ok: false, error: 'bad json' })
       }
+      // Canned AI suggestion (no real LLM) so the client flow can be tested.
+      if ((req.url || '').includes('/api/suggest')) {
+        const days = b.days || []
+        const assignments = (b.places || []).map((p, i) => ({
+          placeId: p.id,
+          dayDate: days[i % Math.max(1, days.length)] || days[0],
+          order: Math.floor(i / Math.max(1, days.length)),
+          startTime: p.category === 'food' ? '12:30' : p.category === 'event' ? '19:00' : '',
+        }))
+        return send(res, 200, {
+          ok: true,
+          reasoning: 'Mock plan: spread places across days, meals at noon, events in the evening.',
+          assignments,
+        })
+      }
       const owner = (k) => k === OWNER_KEY
       if (b.action === 'open') {
         const direct = store.get(b.code)

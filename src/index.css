@@ -862,6 +862,39 @@ select {
   width: auto;
   accent-color: var(--accent);
 }
+
+/* ---------- AI suggestion preview ---------- */
+.suggest-preview {
+  margin: 10px 0 4px;
+  max-height: 42vh;
+  overflow-y: auto;
+}
+.suggest-day {
+  border-top: 1px solid var(--paper-line);
+  padding: 8px 0;
+}
+.suggest-day-head {
+  font-family: var(--hand);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.66rem;
+  color: var(--ink-soft);
+  margin-bottom: 5px;
+}
+.suggest-item {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-family: var(--place-font);
+  font-size: 0.9rem;
+  padding: 2px 0;
+}
+.suggest-time {
+  flex: 0 0 42px;
+  font-family: var(--hand);
+  font-size: 0.75rem;
+  color: var(--accent);
+}
 .search-results {
   margin-top: 6px;
   max-height: 240px;

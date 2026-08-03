@@ -57,6 +57,11 @@ interface TripState {
   moveToWishlist: (placeId: string) => Promise<void>
   /** Duplicate an existing place as a new scheduled stop on a day (for re-adding). */
   copyPlaceToDay: (placeId: string, dayDate: string) => Promise<void>
+  /** Apply an AI-suggested schedule: set day/order/time on the listed places only.
+      Places not in the list (incl. the rest of the wishlist) are left untouched. */
+  applySchedule: (
+    assignments: Array<{ placeId: string; dayDate: string; order: number; startTime?: string }>,
+  ) => Promise<void>
 
   /** Swap in a cloud trip (snapshots the current local one to restore later). */
   enterCloud: (trip: Trip, places: Place[]) => void
@@ -209,6 +214,27 @@ export const useTrip = create<TripState>((set, get) => ({
       status: 'scheduled',
       dayDate,
     })
+  },
+
+  async applySchedule(assignments) {
+    const byId = new Map(assignments.map((a) => [a.placeId, a]))
+    let places = get().places.map((p) => {
+      const a = byId.get(p.id)
+      if (!a) return { ...p } // untouched — wishlist and others preserved
+      return {
+        ...p,
+        status: 'scheduled' as const,
+        dayDate: a.dayDate,
+        order: a.order,
+        startTime: a.startTime || p.startTime,
+      }
+    })
+    // Clean up ordering on every day the schedule touched.
+    for (const day of new Set(assignments.map((a) => a.dayDate))) {
+      places = normalizeOrders(places, day)
+    }
+    if (!get().cloudMode) await db.places.bulkPut(places)
+    set({ places })
   },
 
   enterCloud(trip, places) {
