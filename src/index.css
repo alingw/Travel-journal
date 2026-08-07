@@ -26,7 +26,6 @@
      data / times, one handwritten accent is reserved for personal notes only. */
   --hand: 'Space Mono', 'Courier New', monospace;
   --script: 'Newsreader', Georgia, 'Times New Roman', serif;
-  --note-hand: 'Caveat', 'Segoe Script', cursive;
   --marker: var(--script);
   --place-font: var(--script); /* place names now share the serif voice */
   --label: 0.68rem; /* micro uppercase label size */
@@ -270,10 +269,10 @@ button {
   line-height: 1.5;
 }
 .place-card .note {
-  /* The single handwritten accent, reserved for the traveller's own notes. */
-  font-family: var(--note-hand);
-  font-size: 1.05rem;
-  line-height: 1.25;
+  /* Same serif voice as the place title. */
+  font-family: var(--place-font);
+  font-size: 0.85rem;
+  line-height: 1.4;
   color: var(--ink);
   margin-top: 6px;
 }
@@ -402,6 +401,14 @@ button {
 .day-entries {
   display: flex;
   flex-direction: column;
+}
+/* Where a dragged stop will drop, between existing cards. */
+.insert-line {
+  height: 0;
+  border-top: 2px solid var(--accent);
+  border-radius: 2px;
+  margin: 3px 2px 7px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 .day-empty {
   font-family: var(--hand);
@@ -602,11 +609,11 @@ select {
   background: var(--paper-2);
   font-family: var(--hand);
 }
-/* Warm the base map toward paper but KEEP its colour, so day-coloured pins and
-   routes sit on a living map rather than a dead grey one. */
+/* Fade the base map heavily so it reads as pale paper under the marks. The
+   coloured day pins/routes still pop on top of the muted base. */
 .map-warm .leaflet-tile-pane {
-  filter: sepia(0.16) saturate(0.95) brightness(1.02) contrast(0.94);
-  opacity: 0.92;
+  filter: grayscale(1) brightness(1.15) contrast(0.72);
+  opacity: 0.7;
 }
 .map-marker {
   width: 34px;

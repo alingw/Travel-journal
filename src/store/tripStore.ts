@@ -55,8 +55,9 @@ interface TripState {
   moveInDay: (placeId: string, dir: -1 | 1) => Promise<void>
   /** Send a place back to the wishlist (unscheduled). */
   moveToWishlist: (placeId: string) => Promise<void>
-  /** Duplicate an existing place as a new scheduled stop on a day (for re-adding). */
-  copyPlaceToDay: (placeId: string, dayDate: string) => Promise<void>
+  /** Duplicate an existing place as a new scheduled stop on a day (for re-adding).
+      If index is given, insert at that position; otherwise append. */
+  copyPlaceToDay: (placeId: string, dayDate: string, index?: number) => Promise<void>
   /** Apply an AI-suggested schedule: set day/order/time on the listed places only.
       Places not in the list (incl. the rest of the wishlist) are left untouched. */
   applySchedule: (
@@ -144,20 +145,16 @@ export const useTrip = create<TripState>((set, get) => ({
 
     place.status = 'scheduled'
     place.dayDate = dayDate
-    // Place it at a fractional order so normalize can slot it correctly.
-    if (index === undefined) {
-      const max = Math.max(
-        -1,
-        ...places
-          .filter((p) => p.status === 'scheduled' && p.dayDate === dayDate && p.id !== placeId)
-          .map((p) => p.order ?? 0),
-      )
-      place.order = max + 1
-    } else {
-      place.order = index - 0.5
-    }
 
-    places = normalizeOrders(places, dayDate)
+    // Insert into the day's other stops at `index` (append when omitted), then
+    // rewrite orders 0..n. `index` is a position among the OTHER items.
+    const others = places
+      .filter((p) => p.status === 'scheduled' && p.dayDate === dayDate && p.id !== placeId)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    const at = index === undefined ? others.length : Math.max(0, Math.min(index, others.length))
+    others.splice(at, 0, place)
+    others.forEach((p, i) => (p.order = i))
+
     if (fromDay && fromDay !== dayDate) places = normalizeOrders(places, fromDay)
 
     if (!get().cloudMode) await db.places.bulkPut(places)
@@ -198,10 +195,10 @@ export const useTrip = create<TripState>((set, get) => ({
     set({ places })
   },
 
-  async copyPlaceToDay(placeId, dayDate) {
+  async copyPlaceToDay(placeId, dayDate, index) {
     const src = get().places.find((p) => p.id === placeId)
     if (!src) return
-    await get().addPlace({
+    const created = await get().addPlace({
       name: src.name,
       category: src.category,
       lat: src.lat,
@@ -214,6 +211,8 @@ export const useTrip = create<TripState>((set, get) => ({
       status: 'scheduled',
       dayDate,
     })
+    // Re-slot the fresh copy into the requested position (append is the default).
+    if (index !== undefined) await get().assignToDay(created.id, dayDate, index)
   },
 
   async applySchedule(assignments) {

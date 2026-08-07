@@ -48,21 +48,29 @@ export function DragHandle({ id }: { id: string }) {
   )
 }
 
-/** A droppable zone. `id` should be `${DAY_PREFIX}<iso>` or TRAY_ID. */
+/** A droppable zone. `id` should be `${DAY_PREFIX}<iso>` or TRAY_ID. `dayId`, when
+    given, is exposed as a `data-day` attribute so a drag can locate this day's
+    cards in the DOM to compute a drop-insertion index. */
 export function DropZone({
   id,
   className,
   activeClassName = 'drop-active',
+  dayId,
   children,
 }: {
   id: string
   className: string
   activeClassName?: string
+  dayId?: string
   children: ReactNode
 }) {
   const { setNodeRef, isOver } = useDroppable({ id })
   return (
-    <div ref={setNodeRef} className={`${className} ${isOver ? activeClassName : ''}`}>
+    <div
+      ref={setNodeRef}
+      className={`${className} ${isOver ? activeClassName : ''}`}
+      data-day={dayId}
+    >
       {children}
     </div>
   )
