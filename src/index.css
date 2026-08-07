@@ -1,25 +1,55 @@
 :root {
-  /* Minimal zine palette: aged paper + grayscale, ONE cobalt accent used sparingly. */
-  --paper: #f2efe8;
-  --paper-2: #ece7dd;
-  --paper-line: #d8d3c7; /* hairline rules */
-  --ink: #23231f;
-  --ink-soft: #8b867c; /* low-contrast support marks */
-  --tape: #e6e1d3cc;
-  --accent: #1a3ed9; /* the single high-chroma hue (cobalt / ultramarine) */
-  --terra: var(--accent); /* legacy alias → accent (buttons, active states, route) */
+  color-scheme: light dark;
+  /* Warm-paper journal palette: aged paper + soft ink, ONE cobalt accent reserved
+     for INTERACTIVE elements only (buttons, focus, active state). Data/route color
+     lives elsewhere; stickers, photos and the map now keep their own color. */
+  --paper: #f4efe4;
+  --paper-2: #ece5d6;
+  --paper-line: #d9d1c0; /* hairline rules */
+  --surface: #f8f3ea; /* raised card / day-page surface */
+  --field-bg: #fbf8f1; /* inputs, selects */
+  --panel-bg: #f4efe4f2; /* floating map controls / labels */
+  --ink: #262521;
+  --ink-soft: #6b665c; /* support text — now AA (~4.6:1) on paper */
+  --ink-faint: #9a9384; /* decorative only, never running text */
+  --tape: #e6dcc6cc;
+  --accent: #1a3ed9; /* the single high-chroma hue (cobalt) — INTERACTIVE only */
+  --terra: var(--accent); /* legacy alias → accent */
   --terra-dk: #142fb0;
-  --green: #7c776d; /* neutralised → grayscale support */
+  --green: #7c776d;
   --mustard: #b7b1a3;
   --blue: #55555c;
-  --shadow: none; /* matte, flat — no drop shadows */
-  /* Editorial type: typewriter (mono) for body/micro-labels, serif for display,
-     Montserrat kept for place names. */
+  /* Soft matte elevation — surfaces read as objects, not wireframe rules. */
+  --shadow: 0 1px 2px rgba(40, 36, 28, 0.09);
+  --shadow-lift: 0 6px 20px rgba(40, 36, 28, 0.16);
+  /* Type: serif carries the VOICE (display + place names), mono carries LABELS /
+     data / times, one handwritten accent is reserved for personal notes only. */
   --hand: 'Space Mono', 'Courier New', monospace;
   --script: 'Newsreader', Georgia, 'Times New Roman', serif;
+  --note-hand: 'Caveat', 'Segoe Script', cursive;
   --marker: var(--script);
-  --place-font: 'Montserrat', 'Helvetica Neue', Arial, sans-serif;
+  --place-font: var(--script); /* place names now share the serif voice */
   --label: 0.68rem; /* micro uppercase label size */
+}
+
+/* Dark mode — everything below is token-driven, so the app follows automatically. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #1a1815;
+    --paper-2: #221f19;
+    --paper-line: #3a352c;
+    --surface: #24211a;
+    --field-bg: #221f19;
+    --panel-bg: #1a1815f2;
+    --ink: #ece7db;
+    --ink-soft: #b3aa97;
+    --ink-faint: #7d7565;
+    --tape: #2a261fcc;
+    --accent: #7c93ff; /* lighter cobalt for contrast on dark paper */
+    --terra-dk: #9aabff;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-lift: 0 6px 20px rgba(0, 0, 0, 0.6);
+  }
 }
 
 * {
@@ -69,12 +99,19 @@ button {
   height: 100%;
   width: 100%;
   margin: 0;
-  padding: 0 clamp(16px, 5vw, 90px);
+  padding: 0 clamp(16px, 4vw, 52px);
 }
 
 .header {
-  padding: 26px 2px 10px;
-  position: relative;
+  padding: 24px 2px 10px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.header-title {
+  min-width: 0;
 }
 .header h1 {
   font-family: var(--script);
@@ -93,23 +130,42 @@ button {
   margin-top: 8px;
 }
 .header .tools {
-  position: absolute;
-  top: 24px;
-  right: 2px;
   display: flex;
   gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  padding-top: 8px;
 }
 .icon-btn {
-  font-size: 0.95rem;
-  padding: 6px 8px;
-  border-radius: 2px;
-  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--hand);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.66rem;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--paper-2);
   border: 1px solid var(--paper-line);
-  color: var(--ink-soft);
+  color: var(--ink);
+}
+.icon-btn .ic {
+  font-size: 0.95rem;
+  line-height: 1;
 }
 .icon-btn:hover {
   border-color: var(--ink);
-  color: var(--ink);
+  background: var(--surface);
+}
+/* The one AI action gets the accent treatment so it's discoverable. */
+.icon-btn.accent {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.icon-btn.accent:hover {
+  background: var(--accent);
+  color: #fff;
 }
 
 /* ---------- Tabs ---------- */
@@ -160,8 +216,8 @@ button {
 }
 .sticker svg,
 .map-marker svg {
-  /* Flatten the watercolor art to a single dark-ink mark */
-  filter: grayscale(1) contrast(1.05) brightness(0.5);
+  /* Keep the watercolor art in colour — just a touch richer on paper */
+  filter: saturate(1.05) contrast(1.02);
 }
 .sticker.sm {
   width: 24px;
@@ -173,12 +229,13 @@ button {
   display: flex;
   gap: 12px;
   align-items: flex-start;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid var(--paper-line);
-  border-radius: 0;
-  padding: 12px 2px;
+  background: var(--surface);
+  border: 1px solid var(--paper-line);
+  border-radius: 8px;
+  padding: 11px 12px;
+  margin-bottom: 8px;
   position: relative;
+  box-shadow: var(--shadow);
 }
 .place-card .body {
   flex: 1;
@@ -193,7 +250,9 @@ button {
 }
 .place-card .time {
   font-family: var(--hand);
-  color: var(--accent);
+  /* Data, not a link — kept ink so it never reads as interactive cobalt. */
+  color: var(--ink);
+  font-weight: 700;
   font-size: 0.85rem;
   letter-spacing: 0.05em;
 }
@@ -203,16 +262,20 @@ button {
   margin-top: 2px;
 }
 .place-card .blurb {
-  font-size: 0.8rem;
+  /* Reading text gets the serif — mono was fatiguing over sentences. */
+  font-family: var(--script);
+  font-size: 0.88rem;
   color: var(--ink-soft);
   margin-top: 5px;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 .place-card .note {
-  font-family: var(--hand);
-  font-size: 0.8rem;
+  /* The single handwritten accent, reserved for the traveller's own notes. */
+  font-family: var(--note-hand);
+  font-size: 1.05rem;
+  line-height: 1.25;
   color: var(--ink);
-  margin-top: 5px;
+  margin-top: 6px;
 }
 .place-card .cat-tag {
   display: inline-block;
@@ -225,9 +288,9 @@ button {
   width: 100%;
   max-height: 120px;
   object-fit: cover;
-  border-radius: 0;
+  border-radius: 6px;
   margin-top: 8px;
-  filter: grayscale(1) contrast(0.95);
+  filter: saturate(1.03);
 }
 .mini-btn {
   font-family: var(--hand);
@@ -249,28 +312,81 @@ button {
 }
 .journal-scroll {
   display: flex;
-  gap: 28px;
+  gap: 24px;
   overflow-x: auto;
-  padding-bottom: 10px;
+  padding-bottom: 4px;
   flex: 1;
 }
+
+/* ---------- HScroll: top scrollbar + grab-to-pan ---------- */
+.hscroll {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.hscroll-rail {
+  position: relative;
+  height: 12px;
+  border-radius: 7px;
+  background: var(--paper-2);
+  border: 1px solid var(--paper-line);
+  touch-action: none;
+  cursor: pointer;
+}
+.hscroll-rail.is-hidden {
+  visibility: hidden;
+}
+.hscroll-thumb {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  border-radius: 6px;
+  background: var(--ink-soft);
+  cursor: grab;
+  touch-action: none;
+  transition: background 0.15s ease;
+}
+.hscroll-thumb:hover {
+  background: var(--ink);
+}
+.hscroll-thumb:active {
+  cursor: grabbing;
+  background: var(--accent);
+}
+/* Grab-to-pan affordance + hide the native scrollbar (top rail replaces it). */
+.hscroll-body {
+  cursor: grab;
+  scrollbar-width: none;
+}
+.hscroll-body::-webkit-scrollbar {
+  display: none;
+}
+.hscroll-body.panning {
+  cursor: grabbing;
+  user-select: none;
+}
 .day-page {
-  flex: 0 0 250px;
-  background: transparent;
-  border: none;
-  border-top: 2px solid var(--ink);
-  border-radius: 0;
-  padding: 10px 0 16px;
-  min-height: 320px;
-  transition: border-color 0.18s ease;
+  flex: 0 0 276px;
+  background: var(--paper-2);
+  border: 1px solid var(--paper-line);
+  border-top: 3px solid var(--ink);
+  border-radius: 10px;
+  padding: 12px 12px 16px;
+  min-height: 340px;
+  box-shadow: var(--shadow);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
 .day-page.drop-active {
+  border-color: var(--accent);
   border-top-color: var(--accent);
-  box-shadow: 0 2px 0 var(--accent);
+  box-shadow: var(--shadow-lift);
+  transform: translateY(-2px);
 }
 .day-page h3 {
   font-family: var(--script);
-  font-weight: 500;
+  font-weight: 600;
   font-size: 1.7rem;
   margin: 0;
   color: var(--ink);
@@ -289,13 +405,16 @@ button {
 }
 .day-empty {
   font-family: var(--hand);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--ink-soft);
-  opacity: 0.7;
-  text-align: left;
-  margin-top: 14px;
+  text-align: center;
+  margin-top: 10px;
+  padding: 18px 10px;
+  border: 1px dashed var(--paper-line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
 }
 
 /* tape accent removed in the minimal redesign */
@@ -311,16 +430,20 @@ button {
   align-items: flex-start;
 }
 .tray {
-  flex: 0 0 172px;
-  background: transparent;
-  border: none;
-  border-top: 2px solid var(--ink);
-  border-radius: 0;
-  padding: 10px 0 0;
-  transition: border-color 0.18s ease;
+  flex: 0 0 186px;
+  background: var(--paper-2);
+  border: 1px solid var(--paper-line);
+  border-top: 3px solid var(--ink);
+  border-radius: 10px;
+  padding: 12px 12px 8px;
+  box-shadow: var(--shadow);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 .tray.library {
   border-top-color: var(--paper-line);
+}
+.tray.drop-active {
+  box-shadow: var(--shadow-lift);
 }
 .tray-list {
   display: flex;
@@ -358,13 +481,16 @@ button {
   gap: 8px;
   align-items: center;
   background: transparent;
-  border: none;
-  border-bottom: 1px solid var(--paper-line);
-  border-radius: 0;
-  padding: 8px 2px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 7px 8px;
   touch-action: none;
   cursor: grab;
-  transition: color 0.18s ease, opacity 0.18s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.18s ease;
+}
+.pin-chip:hover {
+  background: var(--surface);
+  border-color: var(--paper-line);
 }
 .pin-chip:active {
   cursor: grabbing;
@@ -407,7 +533,7 @@ button {
   padding: 9px 10px;
   border-radius: 2px;
   border: 1px solid var(--paper-line);
-  background: #faf8f2;
+  background: var(--field-bg);
   color: var(--ink);
 }
 .search-row input:focus {
@@ -457,7 +583,7 @@ select {
   padding: 6px 8px;
   border-radius: 2px;
   border: 1px solid var(--paper-line);
-  background: #faf8f2;
+  background: var(--field-bg);
   color: var(--ink);
 }
 
@@ -473,13 +599,14 @@ select {
 .leaflet-container {
   height: 100%;
   width: 100%;
-  background: #e7e4dc;
+  background: var(--paper-2);
   font-family: var(--hand);
 }
-/* Fade the base map heavily so it reads as pale paper under the marks */
+/* Warm the base map toward paper but KEEP its colour, so day-coloured pins and
+   routes sit on a living map rather than a dead grey one. */
 .map-warm .leaflet-tile-pane {
-  filter: grayscale(1) brightness(1.15) contrast(0.72);
-  opacity: 0.7;
+  filter: sepia(0.16) saturate(0.95) brightness(1.02) contrast(0.94);
+  opacity: 0.92;
 }
 .map-marker {
   width: 34px;
@@ -503,7 +630,7 @@ select {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--ink);
-  background: #f2efe8dd;
+  background: var(--panel-bg);
   padding: 1px 5px;
   border-radius: 0;
   white-space: nowrap;
@@ -525,7 +652,7 @@ select {
   font-size: 0.66rem;
   padding: 5px 10px;
   border-radius: 2px;
-  background: #f2efe8ee;
+  background: var(--panel-bg);
   border: 1px solid var(--paper-line);
   color: var(--ink);
 }
@@ -544,7 +671,7 @@ select {
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--ink);
-  background: #f2efe8ee;
+  background: var(--panel-bg);
   padding: 4px 9px;
   border-radius: 2px;
   border: 1px solid var(--paper-line);
@@ -799,7 +926,7 @@ select {
   padding: 8px 10px;
   border-radius: 2px;
   border: 1px solid var(--paper-line);
-  background: #faf8f2;
+  background: var(--field-bg);
   color: var(--ink);
 }
 .field textarea {
@@ -825,7 +952,7 @@ select {
 .loc-pick {
   border: 1px solid var(--paper-line);
   border-radius: 2px;
-  background: #faf8f2;
+  background: var(--field-bg);
   padding: 7px 9px;
   margin-top: 4px;
   cursor: pointer;
@@ -901,7 +1028,7 @@ select {
   overflow-y: auto;
   border: 1px solid var(--paper-line);
   border-radius: 2px;
-  background: #faf8f2;
+  background: var(--field-bg);
 }
 .search-results .loc-pick {
   border: none;
@@ -926,7 +1053,7 @@ select {
 }
 .mode-toggle {
   display: flex;
-  background: #f2efe8ee;
+  background: var(--panel-bg);
   border: 1px solid var(--paper-line);
   border-radius: 2px;
   overflow: hidden;
@@ -944,7 +1071,7 @@ select {
   color: #fff;
 }
 .legend {
-  background: #f2efe8ee;
+  background: var(--panel-bg);
   border: 1px solid var(--paper-line);
   border-radius: 2px;
   padding: 7px 9px;

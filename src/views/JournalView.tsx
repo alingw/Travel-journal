@@ -15,6 +15,7 @@ import { useTrip, tripDays } from '../store/tripStore'
 import type { Place } from '../types'
 import { PlaceCard } from '../components/PlaceCard'
 import { Sticker } from '../components/Sticker'
+import { HScroll } from '../components/HScroll'
 import {
   DraggableChip,
   DragHandle,
@@ -103,7 +104,7 @@ export function JournalView() {
       measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
     >
       <div className="journal">
-        <div className="journal-scroll">
+        <HScroll className="journal-scroll">
           {days.map((d) => (
             <DropZone key={d} id={DAY_PREFIX + d} className="day-page">
               <h3>{dayNumLabel(d)}</h3>
@@ -129,7 +130,7 @@ export function JournalView() {
               </button>
             </DropZone>
           ))}
-        </div>
+        </HScroll>
 
         <div className="side-trays">
           <DropZone id={TRAY_ID} className="tray">
@@ -173,10 +174,12 @@ function RouteTick() {
   return (
     <div
       style={{
-        height: 16,
+        height: 14,
         marginLeft: 22,
-        borderLeft: '2px dashed var(--terra)',
-        opacity: 0.6,
+        marginTop: -2,
+        marginBottom: 4,
+        borderLeft: '2px dashed var(--ink-faint)',
+        opacity: 0.8,
       }}
     />
   )

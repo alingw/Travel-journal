@@ -37,6 +37,7 @@ export function DragHandle({ id }: { id: string }) {
     <div
       ref={setNodeRef}
       className="mini-btn"
+      data-draghandle
       style={{ cursor: 'grab', touchAction: 'none', opacity: isDragging ? 0.4 : 0.7 }}
       title="Drag to another day / today"
       {...listeners}

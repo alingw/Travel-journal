@@ -63,10 +63,12 @@ export default function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1>{trip.name}</h1>
-        <div className="sub">
-          {trip.baseCity ? `${trip.baseCity} · ` : ''}
-          {dayNumLabel(trip.startDate)} – {dayNumLabel(trip.endDate)}
+        <div className="header-title">
+          <h1>{trip.name}</h1>
+          <div className="sub">
+            {trip.baseCity ? `${trip.baseCity} · ` : ''}
+            {dayNumLabel(trip.startDate)} – {dayNumLabel(trip.endDate)}
+          </div>
         </div>
         <div className="tools">
           <button
@@ -74,20 +76,20 @@ export default function App() {
             title={`Trip menu · ${cloudStatus}`}
             onClick={() => setCloudOpen(true)}
           >
-            {cloudBadge(cloudStatus)}
+            <span className="ic">{cloudBadge(cloudStatus)}</span> Trip
           </button>
           <button
-            className="icon-btn"
-            title="Suggest a schedule (AI)"
+            className="icon-btn accent"
+            title="Suggest a schedule with AI"
             onClick={() => setSuggestOpen(true)}
           >
-            ✦
+            <span className="ic">✦</span> AI plan
           </button>
           <button className="icon-btn" title="Add a stop / event" onClick={() => openEditor()}>
-            ＋
+            <span className="ic">＋</span> Add
           </button>
           <button className="icon-btn" title="Export trip (JSON backup)" onClick={doExport}>
-            ⬇
+            <span className="ic">⬇</span> Export
           </button>
         </div>
       </header>

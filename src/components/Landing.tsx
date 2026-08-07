@@ -19,6 +19,11 @@ export function Landing() {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [mode, setMode] = useState<'home' | 'create' | 'advanced'>('home')
+  // The sync-URL override is a developer/testing tool — hide it from end users.
+  // Visible only in `vite dev`, or on any build via the #dev URL hash.
+  const showAdvanced =
+    import.meta.env.DEV ||
+    (typeof location !== 'undefined' && location.hash.toLowerCase().includes('dev'))
 
   async function doOpen() {
     setErr('')
@@ -72,11 +77,13 @@ export function Landing() {
               ＋ Create a new trip
             </button>
 
-            <div className="landing-foot">
-              <span className="link" onClick={() => setMode('advanced')}>
-                advanced
-              </span>
-            </div>
+            {showAdvanced && (
+              <div className="landing-foot">
+                <span className="link" onClick={() => setMode('advanced')}>
+                  advanced
+                </span>
+              </div>
+            )}
           </>
         )}
 
