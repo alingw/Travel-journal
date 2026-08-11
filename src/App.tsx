@@ -5,6 +5,7 @@ import { JournalView } from './views/JournalView'
 import { WishlistView } from './views/WishlistView'
 import { MapView } from './views/MapView'
 import { TodayView } from './views/TodayView'
+import { SplitView } from './views/SplitView'
 import { PlaceEditor } from './components/PlaceEditor'
 import { CloudPanel } from './components/CloudPanel'
 import { SuggestPanel } from './components/SuggestPanel'
@@ -13,13 +14,14 @@ import { useEditor } from './store/editorStore'
 import { useCloud, isApplyingRemote } from './store/cloudStore'
 import { dayNumLabel } from './utils/dates'
 
-type Tab = 'journal' | 'wishlist' | 'map' | 'today'
+type Tab = 'journal' | 'wishlist' | 'map' | 'today' | 'split'
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'journal', label: 'Journal' },
   { id: 'wishlist', label: 'Wishlist' },
   { id: 'map', label: 'Map' },
   { id: 'today', label: 'Today' },
+  { id: 'split', label: 'Split' },
 ]
 
 export default function App() {
@@ -120,6 +122,7 @@ export default function App() {
           {tab === 'wishlist' && <WishlistView />}
           {tab === 'map' && <MapView />}
           {tab === 'today' && <TodayView />}
+          {tab === 'split' && <SplitView />}
         </motion.div>
       </main>
 

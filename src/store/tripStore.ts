@@ -2,7 +2,7 @@
 // All mutations write through to Dexie so a reload restores exactly.
 
 import { create } from 'zustand'
-import type { Place, Trip, Category, PlaceStatus } from '../types'
+import type { Place, Trip, Category, PlaceStatus, Expense } from '../types'
 import { db } from './db'
 import { resolveStickerId } from '../services/stickers'
 
@@ -64,6 +64,14 @@ interface TripState {
     assignments: Array<{ placeId: string; dayDate: string; order: number; startTime?: string }>,
   ) => Promise<void>
 
+  // ---- Shared expense splitter (stored on the trip so it syncs like the rest) ----
+  setCurrency: (symbol: string) => Promise<void>
+  addParticipant: (name: string) => Promise<void>
+  removeParticipant: (name: string) => Promise<void>
+  addExpense: (input: Omit<Expense, 'id'>) => Promise<void>
+  updateExpense: (id: string, patch: Partial<Omit<Expense, 'id'>>) => Promise<void>
+  deleteExpense: (id: string) => Promise<void>
+
   /** Swap in a cloud trip (snapshots the current local one to restore later). */
   enterCloud: (trip: Trip, places: Place[]) => void
   /** Leave cloud mode and restore the local trip. */
@@ -75,6 +83,21 @@ interface TripState {
 
 // Held outside the store: the local trip snapshot to restore when leaving cloud mode.
 let localSnapshot: { trip: Trip | null; places: Place[] } | null = null
+
+// Apply an update to the current trip (via updater), persist it locally when not
+// in cloud mode, and set it. In cloud mode the App autosave picks up the change.
+async function commitTrip(
+  get: () => TripState,
+  set: (partial: Partial<TripState>) => void,
+  update: (trip: Trip) => Trip,
+) {
+  const trip = get().trip
+  if (!trip) return
+  const next = update(trip)
+  if (next === trip) return // no-op update
+  if (!get().cloudMode) await db.trips.put(next)
+  set({ trip: next })
+}
 
 // Sort a day's places by order and rewrite 0..n so ordering stays clean.
 function normalizeOrders(places: Place[], dayDate: string): Place[] {
@@ -234,6 +257,53 @@ export const useTrip = create<TripState>((set, get) => ({
     }
     if (!get().cloudMode) await db.places.bulkPut(places)
     set({ places })
+  },
+
+  async setCurrency(symbol) {
+    await commitTrip(get, set, (trip) => ({ ...trip, currency: symbol.trim() || '$' }))
+  },
+
+  async addParticipant(name) {
+    const nm = name.trim()
+    if (!nm) return
+    await commitTrip(get, set, (trip) => {
+      const list = trip.participants ?? []
+      if (list.some((p) => p.toLowerCase() === nm.toLowerCase())) return trip
+      return { ...trip, participants: [...list, nm] }
+    })
+  },
+
+  async removeParticipant(name) {
+    await commitTrip(get, set, (trip) => ({
+      ...trip,
+      participants: (trip.participants ?? []).filter((p) => p !== name),
+    }))
+  },
+
+  async addExpense(input) {
+    const exp: Expense = { ...input, id: uid(), title: input.title.trim() || 'Expense' }
+    await commitTrip(get, set, (trip) => {
+      // Make sure the payer and everyone splitting it are listed as participants.
+      const parts = [...(trip.participants ?? [])]
+      for (const nm of [exp.paidBy, ...exp.sharedBy]) {
+        if (nm && !parts.includes(nm)) parts.push(nm)
+      }
+      return { ...trip, participants: parts, expenses: [...(trip.expenses ?? []), exp] }
+    })
+  },
+
+  async updateExpense(id, patch) {
+    await commitTrip(get, set, (trip) => ({
+      ...trip,
+      expenses: (trip.expenses ?? []).map((e) => (e.id === id ? { ...e, ...patch } : e)),
+    }))
+  },
+
+  async deleteExpense(id) {
+    await commitTrip(get, set, (trip) => ({
+      ...trip,
+      expenses: (trip.expenses ?? []).filter((e) => e.id !== id),
+    }))
   },
 
   enterCloud(trip, places) {
