@@ -30,9 +30,88 @@ async function callImage(payload: Record<string, unknown>): Promise<string[]> {
   return urls
 }
 
-// Generate a set of stickers (a "sticker sheet") from one photo.
-export function aiStickers(photoDataUrl: string, n = 6): Promise<string[]> {
-  return callImage({ mode: 'sticker', image: photoDataUrl, n })
+// Generate a sticker set from one photo: a single transparent sheet (one API call,
+// avoiding per-image rate limits) segmented into individual die-cut stickers here.
+export async function aiStickers(photoDataUrl: string): Promise<string[]> {
+  const urls = await callImage({ mode: 'sticker', image: photoDataUrl })
+  const sheet = urls[0]
+  const tiles = await segmentSheet(sheet, 6)
+  return tiles.length ? tiles : [await downscale(sheet, 420, 'image/png')]
+}
+
+// Split a transparent sticker sheet into individual stickers by finding the
+// opaque connected regions (each die-cut sticker is one blob), cropping each to a
+// padded bounding box. Robust to imperfect grid placement.
+export async function segmentSheet(sheetDataUrl: string, maxOut = 6, outMax = 420): Promise<string[]> {
+  const img = await loadImage(sheetDataUrl)
+  const w = img.width
+  const h = img.height
+  const src = document.createElement('canvas')
+  src.width = w
+  src.height = h
+  const sctx = src.getContext('2d')!
+  sctx.drawImage(img, 0, 0)
+  const alpha = sctx.getImageData(0, 0, w, h).data
+
+  const ALPHA = 24
+  const opaque = new Uint8Array(w * h)
+  for (let i = 0; i < w * h; i++) opaque[i] = alpha[i * 4 + 3] > ALPHA ? 1 : 0
+
+  // Flood-fill label the opaque connected components (4-neighbour).
+  const label = new Int32Array(w * h)
+  const stack: number[] = []
+  const comps: { minX: number; minY: number; maxX: number; maxY: number; area: number }[] = []
+  let cur = 0
+  for (let i = 0; i < w * h; i++) {
+    if (!opaque[i] || label[i]) continue
+    cur++
+    let minX = w, minY = h, maxX = 0, maxY = 0, area = 0
+    stack.push(i)
+    label[i] = cur
+    while (stack.length) {
+      const p = stack.pop()!
+      const x = p % w
+      const y = (p - x) / w
+      area++
+      if (x < minX) minX = x
+      if (x > maxX) maxX = x
+      if (y < minY) minY = y
+      if (y > maxY) maxY = y
+      if (x > 0 && opaque[p - 1] && !label[p - 1]) (label[p - 1] = cur), stack.push(p - 1)
+      if (x < w - 1 && opaque[p + 1] && !label[p + 1]) (label[p + 1] = cur), stack.push(p + 1)
+      if (y > 0 && opaque[p - w] && !label[p - w]) (label[p - w] = cur), stack.push(p - w)
+      if (y < h - 1 && opaque[p + w] && !label[p + w]) (label[p + w] = cur), stack.push(p + w)
+    }
+    comps.push({ minX, minY, maxX, maxY, area })
+  }
+
+  // Keep the significant blobs (ignore tiny specks), biggest first, then order by
+  // position (row-major) so the stickers read left-to-right, top-to-bottom.
+  const minArea = w * h * 0.004
+  const sig = comps
+    .filter((k) => k.area >= minArea)
+    .sort((a, b) => b.area - a.area)
+    .slice(0, maxOut)
+    .sort((a, b) => a.minY - b.minY || a.minX - b.minX)
+
+  const tiles: string[] = []
+  for (const k of sig) {
+    const span = Math.max(k.maxX - k.minX, k.maxY - k.minY)
+    const pad = Math.round(span * 0.06)
+    const x0 = Math.max(0, k.minX - pad)
+    const y0 = Math.max(0, k.minY - pad)
+    const x1 = Math.min(w - 1, k.maxX + pad)
+    const y1 = Math.min(h - 1, k.maxY + pad)
+    const bw = x1 - x0 + 1
+    const bh = y1 - y0 + 1
+    const scale = Math.min(1, outMax / Math.max(bw, bh))
+    const out = document.createElement('canvas')
+    out.width = Math.max(1, Math.round(bw * scale))
+    out.height = Math.max(1, Math.round(bh * scale))
+    out.getContext('2d')!.drawImage(src, x0, y0, bw, bh, 0, 0, out.width, out.height)
+    tiles.push(out.toDataURL('image/png'))
+  }
+  return tiles
 }
 
 export async function aiBackground(context: BgContext): Promise<string> {

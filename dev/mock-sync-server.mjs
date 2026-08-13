@@ -3,6 +3,7 @@
 // Then in the app's landing → advanced, set Sync URL to http://localhost:8787
 import http from 'node:http'
 import crypto from 'node:crypto'
+import fs from 'node:fs'
 
 const PORT = 8787
 const OWNER_KEY = 'test-owner'
@@ -51,13 +52,20 @@ http
         return send(res, 400, { ok: false, error: 'bad json' })
       }
       // Canned image generation (no real model) so the journal flow can be tested.
-      // Returns tiny 1x1 PNGs — enough to exercise the multi-sticker + library path.
+      // Returns ONE image (a sticker sheet or background); the client segments the
+      // sheet into individual stickers. Drop a real transparent sheet data-URL in
+      // dev/test-sheet.txt to exercise segmentation; otherwise a 1x1 placeholder.
       if ((req.url || '').includes('/api/image')) {
         const px =
           'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
         if (b.mode === 'background') return send(res, 200, { ok: true, dataUrls: [px] })
-        const n = Math.min(8, Math.max(1, Number(b.n) || 6))
-        return send(res, 200, { ok: true, dataUrls: Array.from({ length: n }, () => px) })
+        let sheet = px
+        try {
+          sheet = fs.readFileSync(new URL('./test-sheet.txt', import.meta.url), 'utf8').trim() || px
+        } catch {
+          /* no test sheet present */
+        }
+        return send(res, 200, { ok: true, dataUrls: [sheet] })
       }
       // Canned AI suggestion (no real LLM) so the client flow can be tested.
       if ((req.url || '').includes('/api/suggest')) {

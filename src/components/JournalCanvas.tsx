@@ -15,7 +15,6 @@ import {
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
 const BASE_WIDTH_PCT = 26 // a scale=1 sticker spans this % of the canvas width
-const STICKERS_PER_PHOTO = 6
 
 // The scrapbook page for one day: a background plus photo-stickers you can drag,
 // resize, rotate, toggle, and delete. Uploading a photo generates a set of stickers
@@ -76,8 +75,7 @@ export function JournalCanvas({
       const photo = await downscale(raw, 1024, 'image/jpeg', 0.9) // shrink before upload
       let srcs: string[]
       try {
-        const ai = await aiStickers(photo, STICKERS_PER_PHOTO)
-        srcs = await Promise.all(ai.map((u) => downscale(u, 420, 'image/png')))
+        srcs = await aiStickers(photo)
         setNote(`Added ${srcs.length} stickers to your library — tap one to place it.`)
       } catch (e: any) {
         srcs = [await cutoutSticker(photo, 420)]

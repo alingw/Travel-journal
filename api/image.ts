@@ -17,14 +17,15 @@ const OPENAI = 'https://api.openai.com/v1/images'
 const MODEL = 'gpt-image-1'
 const GH = 'https://api.github.com'
 
-const STICKER_PROMPT = `Turn this photo into a small die-cut travel sticker.
-Style: opaque gouache / cut-paper / risograph fills, matte colour families, blunt
-simple shapes, visible paper-tooth texture. Keep one clear, recognizable anchor
-from the scene, with a thick warm-white cut border hugging the subject. Give it a
-playful, slightly different composition each time. No photorealism, no detailed
-faces or anatomy, and absolutely no text or lettering. Center the subject on a
-fully transparent background (the sticker itself is opaque; everything outside the
-die-cut border is transparent).`
+const STICKER_PROMPT = `Create a sticker SHEET of SIX different die-cut travel
+stickers based on this photo, arranged in a clean grid of 3 columns and 2 rows.
+Space them out with generous empty margins so no two stickers touch or overlap —
+one distinct sticker per cell. Each sticker: opaque gouache / cut-paper / risograph
+style, matte colour families, blunt simple shapes, paper-tooth texture, a thick
+warm-white die-cut border, showing a different element, subject or view from the
+scene. Every sticker is fully opaque; EVERYTHING outside the die-cut stickers
+(including all the space between them) must be fully transparent. No photorealism,
+no detailed faces or anatomy, and absolutely no text or lettering.`
 
 function backgroundPrompt(ctx: { city?: string; date?: string; places?: string[] }): string {
   const places = (ctx.places || []).filter(Boolean).slice(0, 6).join(', ')
@@ -114,10 +115,9 @@ export default async function handler(req: any, res: any) {
   if (mode === 'sticker' && !body.image)
     return res.status(400).json({ ok: false, error: 'sticker mode needs an image' })
 
-  // How many images this call produces (each counts against the daily cap).
-  const n = mode === 'sticker' ? Math.min(8, Math.max(1, parseInt(body.n, 10) || 6)) : 1
+  // One image per call (a sticker sheet or a background) — sliced client-side.
   const limit = parseInt(process.env.IMAGE_DAILY_LIMIT || '40', 10)
-  if (!(await withinDailyLimit(limit, n)))
+  if (!(await withinDailyLimit(limit, 1)))
     return res.status(429).json({
       ok: false,
       error: `Daily image limit reached (${limit} per day). It resets at UTC midnight.`,
@@ -131,11 +131,11 @@ export default async function handler(req: any, res: any) {
       form.append('model', MODEL)
       form.append('prompt', STICKER_PROMPT)
       form.append('image', new Blob([buf], { type: mime || 'image/png' }), 'photo.png')
-      form.append('size', '1024x1024')
+      form.append('size', '1536x1024') // landscape sheet → ~square 3×2 cells
       form.append('background', 'transparent')
       form.append('output_format', 'png')
-      form.append('quality', body.quality || 'low')
-      form.append('n', String(n))
+      form.append('quality', body.quality || 'medium')
+      form.append('n', '1')
       const r = await fetch(`${OPENAI}/edits`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${key}` },
