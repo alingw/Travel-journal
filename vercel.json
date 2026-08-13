@@ -4,7 +4,7 @@
   "outputDirectory": "dist",
   "functions": {
     "api/suggest.ts": { "maxDuration": 60 },
-    "api/image.ts": { "maxDuration": 120 }
+    "api/image.ts": { "maxDuration": 60 }
   },
   "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }]
 }

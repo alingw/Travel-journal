@@ -111,6 +111,8 @@ export default async function handler(req: any, res: any) {
   const { mode } = body || {}
   if (mode !== 'sticker' && mode !== 'background')
     return res.status(400).json({ ok: false, error: 'mode must be "sticker" or "background"' })
+  if (mode === 'sticker' && !body.image)
+    return res.status(400).json({ ok: false, error: 'sticker mode needs an image' })
 
   // How many images this call produces (each counts against the daily cap).
   const n = mode === 'sticker' ? Math.min(8, Math.max(1, parseInt(body.n, 10) || 6)) : 1
@@ -124,7 +126,6 @@ export default async function handler(req: any, res: any) {
   try {
     if (mode === 'sticker') {
       const { image } = body
-      if (!image) return res.status(400).json({ ok: false, error: 'sticker mode needs an image' })
       const { buf, mime } = dataUrlToBuffer(image)
       const form = new FormData()
       form.append('model', MODEL)

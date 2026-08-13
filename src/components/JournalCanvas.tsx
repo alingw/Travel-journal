@@ -84,7 +84,7 @@ export function JournalCanvas({
         setNote(
           e?.status === 429
             ? 'Daily AI limit reached — saved a plain cut-out to your library instead.'
-            : 'AI stickers unavailable — saved a plain cut-out. (Set OPENAI_API_KEY to enable AI.)',
+            : `AI stickers unavailable: ${e?.message || 'request failed'} — saved a plain cut-out instead.`,
         )
       }
       await addAssets(tripId, 'sticker', srcs)
@@ -108,7 +108,7 @@ export function JournalCanvas({
       setNote(
         e?.status === 429
           ? 'Daily image limit reached — pick a paper background below.'
-          : 'AI background unavailable — pick a paper below. (Set OPENAI_API_KEY to enable AI.)',
+          : `AI background unavailable: ${e?.message || 'request failed'}. Pick a paper below.`,
       )
       setPaperOpen(true)
     } finally {
