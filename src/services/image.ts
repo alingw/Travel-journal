@@ -12,7 +12,7 @@ export interface BgContext {
   places?: string[]
 }
 
-async function callImage(payload: Record<string, unknown>): Promise<string> {
+async function callImage(payload: Record<string, unknown>): Promise<string[]> {
   const res = await fetch(`${getCloudApi()}/api/image`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -24,15 +24,20 @@ async function callImage(payload: Record<string, unknown>): Promise<string> {
     err.status = res.status
     throw err
   }
-  return data.dataUrl as string
+  // New shape returns dataUrls[]; tolerate the old single dataUrl too.
+  const urls: string[] = data.dataUrls || (data.dataUrl ? [data.dataUrl] : [])
+  if (!urls.length) throw new Error('no image returned')
+  return urls
 }
 
-export function aiSticker(photoDataUrl: string): Promise<string> {
-  return callImage({ mode: 'sticker', image: photoDataUrl })
+// Generate a set of stickers (a "sticker sheet") from one photo.
+export function aiStickers(photoDataUrl: string, n = 6): Promise<string[]> {
+  return callImage({ mode: 'sticker', image: photoDataUrl, n })
 }
 
-export function aiBackground(context: BgContext): Promise<string> {
-  return callImage({ mode: 'background', context })
+export async function aiBackground(context: BgContext): Promise<string> {
+  const urls = await callImage({ mode: 'background', context })
+  return urls[0]
 }
 
 // ---------- image helpers (all client-side) ----------

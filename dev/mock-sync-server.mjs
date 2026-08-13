@@ -50,6 +50,15 @@ http
       } catch {
         return send(res, 400, { ok: false, error: 'bad json' })
       }
+      // Canned image generation (no real model) so the journal flow can be tested.
+      // Returns tiny 1x1 PNGs — enough to exercise the multi-sticker + library path.
+      if ((req.url || '').includes('/api/image')) {
+        const px =
+          'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+        if (b.mode === 'background') return send(res, 200, { ok: true, dataUrls: [px] })
+        const n = Math.min(8, Math.max(1, Number(b.n) || 6))
+        return send(res, 200, { ok: true, dataUrls: Array.from({ length: n }, () => px) })
+      }
       // Canned AI suggestion (no real LLM) so the client flow can be tested.
       if ((req.url || '').includes('/api/suggest')) {
         mockSuggestCount++

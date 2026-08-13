@@ -39,7 +39,7 @@ Generate new token:
   | `ANTHROPIC_API_KEY` | *(optional)* your Anthropic API key — only needed for the **✦ Suggest a schedule** AI button; costs a few cents per suggestion |
   | `SUGGEST_DAILY_LIMIT` | *(optional)* max AI suggestions per day (default **5**). The count is stored in your data repo (`usage/suggest-<date>.json`) and resets at UTC midnight. Set to `0` to disable the cap. |
   | `OPENAI_API_KEY` | *(optional)* your OpenAI API key — only needed for the **Today → Journal** AI photo-stickers and AI backgrounds (uses `gpt-image-1`; your OpenAI org must be **verified** for that model). Without it the journal still works with client-side cut-out stickers + paper backgrounds. |
-  | `IMAGE_DAILY_LIMIT` | *(optional)* max AI images (stickers + backgrounds) per day (default **20**). Stored in `usage/image-<date>.json`, resets at UTC midnight. Set to `0` to disable the cap. |
+  | `IMAGE_DAILY_LIMIT` | *(optional)* max AI images per day (default **40**). Each photo makes **6** sticker images, so 40 ≈ 6 photo uploads + a few backgrounds. Stored in `usage/image-<date>.json`, resets at UTC midnight. Set to `0` to disable the cap. |
 - Deploy. You'll get a URL like `https://travel-journal-xyz.vercel.app`.
 
 The app **and** the sync API are served from that one URL (`/` = app,

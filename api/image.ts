@@ -17,12 +17,14 @@ const OPENAI = 'https://api.openai.com/v1/images'
 const MODEL = 'gpt-image-1'
 const GH = 'https://api.github.com'
 
-const STICKER_PROMPT = `Transform this photo into ONE die-cut travel sticker.
-Style: opaque gouache / cut-paper / risograph, matte color families, blunt simple
-shapes, visible paper-tooth texture. Keep a single clear, recognizable anchor from
-the scene. Add a thick warm-white cut border hugging the subject. No photorealism,
-no detailed faces or anatomy, and absolutely no text or lettering. Center the
-subject on a fully transparent background.`
+const STICKER_PROMPT = `Turn this photo into a small die-cut travel sticker.
+Style: opaque gouache / cut-paper / risograph fills, matte colour families, blunt
+simple shapes, visible paper-tooth texture. Keep one clear, recognizable anchor
+from the scene, with a thick warm-white cut border hugging the subject. Give it a
+playful, slightly different composition each time. No photorealism, no detailed
+faces or anatomy, and absolutely no text or lettering. Center the subject on a
+fully transparent background (the sticker itself is opaque; everything outside the
+die-cut border is transparent).`
 
 function backgroundPrompt(ctx: { city?: string; date?: string; places?: string[] }): string {
   const places = (ctx.places || []).filter(Boolean).slice(0, 6).join(', ')
@@ -65,7 +67,8 @@ async function ghPut(repo: string, token: string, path: string, obj: any, sha?: 
   })
   return { ok: res.ok, status: res.status }
 }
-async function withinDailyLimit(limit: number): Promise<boolean> {
+// Reserves `cost` images against today's cap (each generated image counts).
+async function withinDailyLimit(limit: number, cost: number): Promise<boolean> {
   const repo = process.env.DATA_REPO
   const token = process.env.GITHUB_TOKEN
   if (!repo || !token || !(limit > 0)) return true
@@ -74,8 +77,8 @@ async function withinDailyLimit(limit: number): Promise<boolean> {
   for (let attempt = 0; attempt < 3; attempt++) {
     const cur = await ghGet(repo, token, path)
     const count: number = cur?.data?.count ?? 0
-    if (count >= limit) return false
-    const put = await ghPut(repo, token, path, { date, count: count + 1 }, cur?.sha)
+    if (count + cost > limit) return false
+    const put = await ghPut(repo, token, path, { date, count: count + cost }, cur?.sha)
     if (put.ok || put.status !== 409) return true
   }
   return true
@@ -109,8 +112,10 @@ export default async function handler(req: any, res: any) {
   if (mode !== 'sticker' && mode !== 'background')
     return res.status(400).json({ ok: false, error: 'mode must be "sticker" or "background"' })
 
-  const limit = parseInt(process.env.IMAGE_DAILY_LIMIT || '20', 10)
-  if (!(await withinDailyLimit(limit)))
+  // How many images this call produces (each counts against the daily cap).
+  const n = mode === 'sticker' ? Math.min(8, Math.max(1, parseInt(body.n, 10) || 6)) : 1
+  const limit = parseInt(process.env.IMAGE_DAILY_LIMIT || '40', 10)
+  if (!(await withinDailyLimit(limit, n)))
     return res.status(429).json({
       ok: false,
       error: `Daily image limit reached (${limit} per day). It resets at UTC midnight.`,
@@ -129,6 +134,7 @@ export default async function handler(req: any, res: any) {
       form.append('background', 'transparent')
       form.append('output_format', 'png')
       form.append('quality', body.quality || 'low')
+      form.append('n', String(n))
       const r = await fetch(`${OPENAI}/edits`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${key}` },
@@ -138,9 +144,12 @@ export default async function handler(req: any, res: any) {
       if (!r.ok) {
         return res.status(502).json({ ok: false, error: data?.error?.message || `OpenAI ${r.status}` })
       }
-      const b64 = data?.data?.[0]?.b64_json
-      if (!b64) return res.status(502).json({ ok: false, error: 'no image returned' })
-      return res.status(200).json({ ok: true, dataUrl: `data:image/png;base64,${b64}` })
+      const urls = (data?.data || [])
+        .map((d: any) => d?.b64_json)
+        .filter(Boolean)
+        .map((b: string) => `data:image/png;base64,${b}`)
+      if (!urls.length) return res.status(502).json({ ok: false, error: 'no image returned' })
+      return res.status(200).json({ ok: true, dataUrls: urls })
     }
 
     // background
@@ -164,7 +173,7 @@ export default async function handler(req: any, res: any) {
     }
     const b64 = data?.data?.[0]?.b64_json
     if (!b64) return res.status(502).json({ ok: false, error: 'no image returned' })
-    return res.status(200).json({ ok: true, dataUrl: `data:image/jpeg;base64,${b64}` })
+    return res.status(200).json({ ok: true, dataUrls: [`data:image/jpeg;base64,${b64}`] })
   } catch (e: any) {
     return res.status(500).json({ ok: false, error: e?.message ?? 'image generation failed' })
   }

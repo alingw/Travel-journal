@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useJournal } from '../store/journalStore'
+import { useAssets } from '../store/assetStore'
 import type { JournalSticker } from '../types'
 import {
-  aiSticker,
+  aiStickers,
   aiBackground,
   cutoutSticker,
   downscale,
@@ -14,10 +15,12 @@ import {
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
 const BASE_WIDTH_PCT = 26 // a scale=1 sticker spans this % of the canvas width
+const STICKERS_PER_PHOTO = 6
 
 // The scrapbook page for one day: a background plus photo-stickers you can drag,
-// resize, rotate, toggle, and delete. AI-styled when a key is set, otherwise a
-// client-side die-cut cut-out.
+// resize, rotate, toggle, and delete. Uploading a photo generates a set of stickers
+// (AI when a key is set, otherwise a client-side die-cut cut-out) that are saved to
+// a reusable per-trip library; tap any saved sticker/background to drop it on a day.
 export function JournalCanvas({
   tripId,
   day,
@@ -35,9 +38,17 @@ export function JournalCanvas({
   const setBackground = useJournal((s) => s.setBackground)
   const setCaption = useJournal((s) => s.setCaption)
 
+  const loadAssets = useAssets((s) => s.load)
+  const addAssets = useAssets((s) => s.addMany)
+  const removeAsset = useAssets((s) => s.remove)
+  const lib = useAssets((s) => s.byTrip[tripId])
+  const stickerLib = useMemo(() => (lib ?? []).filter((a) => a.kind === 'sticker'), [lib])
+  const bgLib = useMemo(() => (lib ?? []).filter((a) => a.kind === 'background'), [lib])
+
   useEffect(() => {
     load(tripId, day)
-  }, [tripId, day, load])
+    loadAssets(tripId)
+  }, [tripId, day, load, loadAssets])
 
   const stickers = page?.stickers ?? []
   const visible = stickers.filter((s) => !s.hidden)
@@ -51,31 +62,32 @@ export function JournalCanvas({
   const fileRef = useRef<HTMLInputElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
 
-  // Live drag position (kept out of the store so we only persist on release).
   const drag = useRef<{ id: string; px: number; py: number; x: number; y: number; w: number; h: number } | null>(null)
   const [dragPos, setDragPos] = useState<{ id: string; x: number; y: number } | null>(null)
 
   const sel = stickers.find((s) => s.id === selected && !s.hidden) || null
 
+  // Upload a photo → generate a sticker set → save to the trip library.
   async function onPickPhoto(file: File) {
     setNote('')
     setAdding(true)
     try {
       const raw = await fileToDataUrl(file)
       const photo = await downscale(raw, 1024, 'image/jpeg', 0.9) // shrink before upload
-      let src: string
+      let srcs: string[]
       try {
-        const ai = await aiSticker(photo)
-        src = await downscale(ai, 420, 'image/png')
+        const ai = await aiStickers(photo, STICKERS_PER_PHOTO)
+        srcs = await Promise.all(ai.map((u) => downscale(u, 420, 'image/png')))
+        setNote(`Added ${srcs.length} stickers to your library — tap one to place it.`)
       } catch (e: any) {
-        src = await cutoutSticker(photo, 420)
+        srcs = [await cutoutSticker(photo, 420)]
         setNote(
           e?.status === 429
-            ? 'Daily AI limit reached — added a plain cut-out instead.'
-            : 'AI sticker unavailable — added a plain cut-out. (Set OPENAI_API_KEY to enable AI.)',
+            ? 'Daily AI limit reached — saved a plain cut-out to your library instead.'
+            : 'AI stickers unavailable — saved a plain cut-out. (Set OPENAI_API_KEY to enable AI.)',
         )
       }
-      await addSticker(tripId, day, src)
+      await addAssets(tripId, 'sticker', srcs)
     } catch (e: any) {
       setNote(e?.message ?? 'could not add that photo')
     } finally {
@@ -90,7 +102,8 @@ export function JournalCanvas({
     try {
       const ai = await aiBackground(bgContext)
       const small = await downscale(ai, 1280, 'image/jpeg', 0.82)
-      await setBackground(tripId, day, small)
+      const [asset] = await addAssets(tripId, 'background', [small])
+      await setBackground(tripId, day, asset.src)
     } catch (e: any) {
       setNote(
         e?.status === 429
@@ -147,7 +160,7 @@ export function JournalCanvas({
       {/* Toolbar */}
       <div className="jc-toolbar">
         <button className="btn" disabled={adding} onClick={() => fileRef.current?.click()}>
-          {adding ? <span className="spin">↻</span> : '＋'} Photo sticker
+          {adding ? <span className="spin">↻</span> : '＋'} Photo → 6 stickers
         </button>
         <button className="btn ghost" disabled={bgBusy} onClick={genBackground}>
           {bgBusy ? <span className="spin">↻</span> : '✦'} AI background
@@ -196,7 +209,7 @@ export function JournalCanvas({
         onPointerDown={() => setSelected(null)}
       >
         {visible.length === 0 && (
-          <div className="jc-empty">Add a photo sticker · pick a background · drag things around</div>
+          <div className="jc-empty">Add photo stickers · pick a background · drag things around</div>
         )}
         {visible.map((s) => {
           const live = dragPos && dragPos.id === s.id ? dragPos : s
@@ -250,7 +263,46 @@ export function JournalCanvas({
         </div>
       )}
 
-      {/* Hidden-sticker tray */}
+      {/* Sticker library (reusable) */}
+      {(stickerLib.length > 0 || adding) && (
+        <div className="jc-section">
+          <span className="u-label">Your stickers · tap to place</span>
+          <div className="jc-lib">
+            {adding && <div className="jc-lib-item loading"><span className="spin">↻</span></div>}
+            {stickerLib.map((a) => (
+              <div key={a.id} className="jc-lib-item">
+                <button className="jc-lib-place" title="Place on this day" onClick={() => addSticker(tripId, day, a.src)}>
+                  <img src={a.src} alt="" draggable={false} />
+                </button>
+                <button className="jc-lib-del" title="Remove from library" onClick={() => removeAsset(tripId, a.id)}>
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Background library (reusable) */}
+      {bgLib.length > 0 && (
+        <div className="jc-section">
+          <span className="u-label">Backgrounds · tap to use</span>
+          <div className="jc-lib">
+            {bgLib.map((a) => (
+              <div key={a.id} className="jc-lib-item bg">
+                <button className="jc-lib-place" title="Use on this day" onClick={() => setBackground(tripId, day, a.src)}>
+                  <img src={a.src} alt="" draggable={false} />
+                </button>
+                <button className="jc-lib-del" title="Remove from library" onClick={() => removeAsset(tripId, a.id)}>
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Hidden-sticker tray (this day) */}
       {hidden.length > 0 && (
         <div className="jc-tray">
           <span className="u-label">Hidden</span>

@@ -77,6 +77,16 @@ export interface DayJournal {
   updatedAt: number
 }
 
+// A saved, reusable image (generated sticker or background) at the trip level, so
+// it can be dropped onto any day again. Device-local, like DayJournal.
+export interface Asset {
+  id: string
+  tripId: string
+  kind: 'sticker' | 'background'
+  src: string // data URL
+  createdAt: number
+}
+
 export const CATEGORY_LABELS: Record<Category, string> = {
   arrival: 'Arrival',
   lodging: 'Stay',
