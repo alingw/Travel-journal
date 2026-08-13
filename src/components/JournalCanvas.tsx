@@ -1,0 +1,279 @@
+import { useEffect, useRef, useState } from 'react'
+import { useJournal } from '../store/journalStore'
+import type { JournalSticker } from '../types'
+import {
+  aiSticker,
+  aiBackground,
+  cutoutSticker,
+  downscale,
+  fileToDataUrl,
+  backgroundStyle,
+  PAPERS,
+  type BgContext,
+} from '../services/image'
+
+const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
+const BASE_WIDTH_PCT = 26 // a scale=1 sticker spans this % of the canvas width
+
+// The scrapbook page for one day: a background plus photo-stickers you can drag,
+// resize, rotate, toggle, and delete. AI-styled when a key is set, otherwise a
+// client-side die-cut cut-out.
+export function JournalCanvas({
+  tripId,
+  day,
+  bgContext,
+}: {
+  tripId: string
+  day: string
+  bgContext: BgContext
+}) {
+  const load = useJournal((s) => s.load)
+  const page = useJournal((s) => s.byKey[`${tripId}::${day}`])
+  const addSticker = useJournal((s) => s.addSticker)
+  const updateSticker = useJournal((s) => s.updateSticker)
+  const removeSticker = useJournal((s) => s.removeSticker)
+  const setBackground = useJournal((s) => s.setBackground)
+  const setCaption = useJournal((s) => s.setCaption)
+
+  useEffect(() => {
+    load(tripId, day)
+  }, [tripId, day, load])
+
+  const stickers = page?.stickers ?? []
+  const visible = stickers.filter((s) => !s.hidden)
+  const hidden = stickers.filter((s) => s.hidden)
+
+  const [selected, setSelected] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
+  const [bgBusy, setBgBusy] = useState(false)
+  const [note, setNote] = useState('')
+  const [paperOpen, setPaperOpen] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const canvasRef = useRef<HTMLDivElement>(null)
+
+  // Live drag position (kept out of the store so we only persist on release).
+  const drag = useRef<{ id: string; px: number; py: number; x: number; y: number; w: number; h: number } | null>(null)
+  const [dragPos, setDragPos] = useState<{ id: string; x: number; y: number } | null>(null)
+
+  const sel = stickers.find((s) => s.id === selected && !s.hidden) || null
+
+  async function onPickPhoto(file: File) {
+    setNote('')
+    setAdding(true)
+    try {
+      const raw = await fileToDataUrl(file)
+      const photo = await downscale(raw, 1024, 'image/jpeg', 0.9) // shrink before upload
+      let src: string
+      try {
+        const ai = await aiSticker(photo)
+        src = await downscale(ai, 420, 'image/png')
+      } catch (e: any) {
+        src = await cutoutSticker(photo, 420)
+        setNote(
+          e?.status === 429
+            ? 'Daily AI limit reached — added a plain cut-out instead.'
+            : 'AI sticker unavailable — added a plain cut-out. (Set OPENAI_API_KEY to enable AI.)',
+        )
+      }
+      await addSticker(tripId, day, src)
+    } catch (e: any) {
+      setNote(e?.message ?? 'could not add that photo')
+    } finally {
+      setAdding(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
+  async function genBackground() {
+    setNote('')
+    setBgBusy(true)
+    try {
+      const ai = await aiBackground(bgContext)
+      const small = await downscale(ai, 1280, 'image/jpeg', 0.82)
+      await setBackground(tripId, day, small)
+    } catch (e: any) {
+      setNote(
+        e?.status === 429
+          ? 'Daily image limit reached — pick a paper background below.'
+          : 'AI background unavailable — pick a paper below. (Set OPENAI_API_KEY to enable AI.)',
+      )
+      setPaperOpen(true)
+    } finally {
+      setBgBusy(false)
+    }
+  }
+
+  // ---- sticker dragging ----
+  function onDown(e: React.PointerEvent, s: JournalSticker) {
+    e.stopPropagation()
+    setSelected(s.id)
+    const rect = canvasRef.current?.getBoundingClientRect()
+    if (!rect) return
+    drag.current = { id: s.id, px: e.clientX, py: e.clientY, x: s.x, y: s.y, w: rect.width, h: rect.height }
+    try {
+      ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
+    } catch {
+      /* capture optional */
+    }
+  }
+  function onMove(e: React.PointerEvent) {
+    const d = drag.current
+    if (!d) return
+    const nx = clamp(d.x + (e.clientX - d.px) / d.w, 0, 1)
+    const ny = clamp(d.y + (e.clientY - d.py) / d.h, 0, 1)
+    setDragPos({ id: d.id, x: nx, y: ny })
+  }
+  function onUp() {
+    const d = drag.current
+    drag.current = null
+    if (d && dragPos && dragPos.id === d.id) {
+      updateSticker(tripId, day, d.id, { x: dragPos.x, y: dragPos.y })
+    }
+    setDragPos(null)
+  }
+
+  const topZ = () => stickers.reduce((m, s) => Math.max(m, s.z), 0) + 1
+
+  return (
+    <div className="journal-canvas-wrap">
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden-file"
+        onChange={(e) => e.target.files?.[0] && onPickPhoto(e.target.files[0])}
+      />
+
+      {/* Toolbar */}
+      <div className="jc-toolbar">
+        <button className="btn" disabled={adding} onClick={() => fileRef.current?.click()}>
+          {adding ? <span className="spin">↻</span> : '＋'} Photo sticker
+        </button>
+        <button className="btn ghost" disabled={bgBusy} onClick={genBackground}>
+          {bgBusy ? <span className="spin">↻</span> : '✦'} AI background
+        </button>
+        <div className="jc-paper">
+          <button className="btn ghost" onClick={() => setPaperOpen((v) => !v)}>
+            Paper ▾
+          </button>
+          {paperOpen && (
+            <div className="jc-paper-menu">
+              {PAPERS.map((p) => (
+                <button
+                  key={p.id}
+                  className="jc-paper-swatch"
+                  title={p.label}
+                  style={{ background: p.css }}
+                  onClick={() => {
+                    setBackground(tripId, day, `paper:${p.id}`)
+                    setPaperOpen(false)
+                  }}
+                />
+              ))}
+              {page?.background && (
+                <button
+                  className="mini-btn"
+                  onClick={() => {
+                    setBackground(tripId, day, undefined)
+                    setPaperOpen(false)
+                  }}
+                >
+                  clear
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {note && <div className="banner">{note}</div>}
+
+      {/* The page */}
+      <div
+        className="journal-canvas"
+        ref={canvasRef}
+        style={{ background: backgroundStyle(page?.background) }}
+        onPointerDown={() => setSelected(null)}
+      >
+        {visible.length === 0 && (
+          <div className="jc-empty">Add a photo sticker · pick a background · drag things around</div>
+        )}
+        {visible.map((s) => {
+          const live = dragPos && dragPos.id === s.id ? dragPos : s
+          return (
+            <div
+              key={s.id}
+              className={`jc-sticker ${selected === s.id ? 'selected' : ''}`}
+              style={{
+                left: `${live.x * 100}%`,
+                top: `${live.y * 100}%`,
+                width: `${BASE_WIDTH_PCT * s.scale}%`,
+                transform: `translate(-50%, -50%) rotate(${s.rot}deg)`,
+                zIndex: s.z,
+              }}
+              onPointerDown={(e) => onDown(e, s)}
+              onPointerMove={onMove}
+              onPointerUp={onUp}
+              onPointerCancel={onUp}
+            >
+              <img src={s.src} alt={s.label || 'sticker'} draggable={false} />
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Selected-sticker controls */}
+      {sel && (
+        <div className="jc-controls">
+          <span className="u-label">Sticker</span>
+          <button className="mini-btn" title="Smaller" onClick={() => updateSticker(tripId, day, sel.id, { scale: clamp(sel.scale / 1.15, 0.4, 2.6) })}>
+            −
+          </button>
+          <button className="mini-btn" title="Bigger" onClick={() => updateSticker(tripId, day, sel.id, { scale: clamp(sel.scale * 1.15, 0.4, 2.6) })}>
+            ＋
+          </button>
+          <button className="mini-btn" title="Rotate left" onClick={() => updateSticker(tripId, day, sel.id, { rot: sel.rot - 15 })}>
+            ⟲
+          </button>
+          <button className="mini-btn" title="Rotate right" onClick={() => updateSticker(tripId, day, sel.id, { rot: sel.rot + 15 })}>
+            ⟳
+          </button>
+          <button className="mini-btn" title="Bring to front" onClick={() => updateSticker(tripId, day, sel.id, { z: topZ() })}>
+            ⤒ front
+          </button>
+          <button className="mini-btn" title="Hide (to tray)" onClick={() => { updateSticker(tripId, day, sel.id, { hidden: true }); setSelected(null) }}>
+            🙈 hide
+          </button>
+          <button className="mini-btn" title="Delete" onClick={() => { removeSticker(tripId, day, sel.id); setSelected(null) }}>
+            🗑 delete
+          </button>
+        </div>
+      )}
+
+      {/* Hidden-sticker tray */}
+      {hidden.length > 0 && (
+        <div className="jc-tray">
+          <span className="u-label">Hidden</span>
+          {hidden.map((s) => (
+            <button
+              key={s.id}
+              className="jc-tray-item"
+              title="Tap to place back"
+              onClick={() => updateSticker(tripId, day, s.id, { hidden: false, z: topZ() })}
+            >
+              <img src={s.src} alt="" draggable={false} />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Day caption */}
+      <textarea
+        className="jc-caption"
+        placeholder="Write about this day…"
+        value={page?.caption ?? ''}
+        onChange={(e) => setCaption(tripId, day, e.target.value)}
+      />
+    </div>
+  )
+}

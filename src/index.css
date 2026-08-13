@@ -709,6 +709,190 @@ select {
 .today-drop.drop-active {
   border-top-color: var(--accent);
 }
+.today-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+/* Plan / Journal segmented toggle */
+.seg-toggle {
+  display: inline-flex;
+  border: 1px solid var(--paper-line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--paper-2);
+}
+.seg-toggle button {
+  font-family: var(--hand);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.66rem;
+  padding: 7px 12px;
+  color: var(--ink-soft);
+}
+.seg-toggle button.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ---------- Day journal (scrapbook canvas) ---------- */
+.journal-canvas-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.jc-toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.jc-paper {
+  position: relative;
+}
+.jc-paper-menu {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  left: 0;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 8px;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  border-radius: 8px;
+  box-shadow: var(--shadow-lift);
+}
+.jc-paper-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--paper-line);
+  background-size: cover;
+}
+.jc-paper-swatch:hover {
+  border-color: var(--accent);
+}
+
+.journal-canvas {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  border: 1px solid var(--ink);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  touch-action: none;
+  background-color: var(--paper-2);
+}
+.jc-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 0 24px;
+  text-align: center;
+  font-family: var(--hand);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.66rem;
+  color: var(--ink-soft);
+  pointer-events: none;
+}
+.jc-sticker {
+  position: absolute;
+  cursor: grab;
+  filter: drop-shadow(0 3px 5px rgba(30, 26, 18, 0.28));
+  user-select: none;
+}
+.jc-sticker:active {
+  cursor: grabbing;
+}
+.jc-sticker img {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+}
+.jc-sticker.selected {
+  outline: 2px dashed var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.jc-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  background: var(--paper-2);
+  border: 1px solid var(--paper-line);
+  border-radius: 8px;
+}
+.jc-controls .u-label {
+  color: var(--ink-soft);
+  margin-right: 4px;
+}
+.jc-controls .mini-btn {
+  border: 1px solid var(--paper-line);
+  border-radius: 6px;
+  padding: 4px 7px;
+}
+.jc-controls .mini-btn:hover {
+  border-color: var(--accent);
+}
+
+.jc-tray {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.jc-tray .u-label {
+  color: var(--ink-soft);
+}
+.jc-tray-item {
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 1px solid var(--paper-line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+  opacity: 0.75;
+}
+.jc-tray-item:hover {
+  opacity: 1;
+  border-color: var(--accent);
+}
+.jc-tray-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.jc-caption {
+  width: 100%;
+  min-height: 54px;
+  resize: vertical;
+  font-family: var(--note-hand, var(--script));
+  font-size: 1.05rem;
+  line-height: 1.35;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--paper-line);
+  background: var(--field-bg);
+  color: var(--ink);
+}
+.jc-caption:focus {
+  outline: none;
+  border-color: var(--accent);
+}
 
 /* ---------- Split & settle ---------- */
 .split-wrap {

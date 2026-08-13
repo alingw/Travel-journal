@@ -53,6 +53,30 @@ export interface Place {
   startTime?: string // "HH:mm", optional
 }
 
+// ---- Day journal (the scrapbook canvas on the Today tab) ----
+// Stored locally on the device (images are too large for the synced trip file).
+export interface JournalSticker {
+  id: string
+  src: string // data URL (png, transparent)
+  x: number // 0..1, center position relative to the canvas
+  y: number // 0..1
+  scale: number // size multiplier (1 = base)
+  rot: number // rotation in degrees
+  z: number // stacking order
+  hidden?: boolean // toggled off (kept in the tray)
+  label?: string
+}
+
+export interface DayJournal {
+  key: string // `${tripId}::${day}`
+  tripId: string
+  day: string // ISO yyyy-mm-dd
+  background?: string // data URL (jpeg) OR a built-in texture id like "paper:cream"
+  stickers: JournalSticker[]
+  caption?: string // handwritten note for the day
+  updatedAt: number
+}
+
 export const CATEGORY_LABELS: Record<Category, string> = {
   arrival: 'Arrival',
   lodging: 'Stay',

@@ -2,6 +2,9 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "functions": { "api/suggest.ts": { "maxDuration": 60 } },
+  "functions": {
+    "api/suggest.ts": { "maxDuration": 60 },
+    "api/image.ts": { "maxDuration": 120 }
+  },
   "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }]
 }
