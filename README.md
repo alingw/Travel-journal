@@ -2,8 +2,7 @@
 
 A hand-drawn **travel journal & planner** PWA. Plan where to go and where to eat,
 pin "maybe" places, and see the whole trip on an animated watercolor map — with
-sticker pins, handwritten notes, and drag-to-schedule. Ships seeded with a
-**US Open 2026 (New York, Aug 23–27)** example trip.
+sticker pins, handwritten notes, and drag-to-schedule. 
 
 ## Features
 - **📖 Journal** — a page per day with handwritten notes, stickers, and times.
