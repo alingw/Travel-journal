@@ -18,14 +18,16 @@ const MODEL = 'gpt-image-1'
 const GH = 'https://api.github.com'
 
 const STICKER_PROMPT = `Create a sticker SHEET of SIX different die-cut travel
-stickers based on this photo, arranged in a clean grid of 3 columns and 2 rows.
-Space them out with generous empty margins so no two stickers touch or overlap —
-one distinct sticker per cell. Each sticker: opaque gouache / cut-paper / risograph
-style, matte colour families, blunt simple shapes, paper-tooth texture, a thick
-warm-white die-cut border, showing a different element, subject or view from the
-scene. Every sticker is fully opaque; EVERYTHING outside the die-cut stickers
-(including all the space between them) must be fully transparent. No photorealism,
-no detailed faces or anatomy, and absolutely no text or lettering.`
+stickers based on this photo, arranged in a neat grid of 3 columns and 2 rows,
+evenly spaced and clearly separated so no two stickers touch or overlap. Each
+sticker: opaque gouache / cut-paper / risograph style, matte colour families,
+blunt simple shapes, paper-tooth texture, a thick solid WHITE die-cut border,
+showing a different element, subject or view from the scene.
+Fill the ENTIRE background and ALL the space between the stickers with the SAME
+solid, uniform, bright chroma GREEN (hex #00FF00) — a flat green screen: no
+gradient, no other colour, and no shadows cast on the green. Do NOT use green
+anywhere inside the stickers. No photorealism, no detailed faces or anatomy, and
+absolutely no text or lettering.`
 
 function backgroundPrompt(ctx: { city?: string; date?: string; places?: string[] }): string {
   const places = (ctx.places || []).filter(Boolean).slice(0, 6).join(', ')
@@ -132,7 +134,7 @@ export default async function handler(req: any, res: any) {
       form.append('prompt', STICKER_PROMPT)
       form.append('image', new Blob([buf], { type: mime || 'image/png' }), 'photo.png')
       form.append('size', '1536x1024') // landscape sheet → ~square 3×2 cells
-      form.append('background', 'transparent')
+      form.append('background', 'opaque') // solid green screen, keyed out client-side
       form.append('output_format', 'png')
       form.append('quality', body.quality || 'medium')
       form.append('n', '1')

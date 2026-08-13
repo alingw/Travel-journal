@@ -39,9 +39,10 @@ export async function aiStickers(photoDataUrl: string): Promise<string[]> {
   return tiles.length ? tiles : [await downscale(sheet, 420, 'image/png')]
 }
 
-// Split a transparent sticker sheet into individual stickers by finding the
-// opaque connected regions (each die-cut sticker is one blob), cropping each to a
-// padded bounding box. Robust to imperfect grid placement.
+// Split a sticker sheet into individual die-cut stickers. The sheet comes back on
+// a solid green chroma-key background; we key the green to transparent (with a mild
+// despill), find the opaque connected regions (one per sticker), and crop each to a
+// padded bounding box. Falls back to an even 3×2 grid slice if keying finds too few.
 export async function segmentSheet(sheetDataUrl: string, maxOut = 6, outMax = 420): Promise<string[]> {
   const img = await loadImage(sheetDataUrl)
   const w = img.width
@@ -51,11 +52,24 @@ export async function segmentSheet(sheetDataUrl: string, maxOut = 6, outMax = 42
   src.height = h
   const sctx = src.getContext('2d')!
   sctx.drawImage(img, 0, 0)
-  const alpha = sctx.getImageData(0, 0, w, h).data
+  const imgData = sctx.getImageData(0, 0, w, h)
+  const d = imgData.data
 
-  const ALPHA = 24
+  // Chroma-key: drop pixels that are green-screen (green clearly dominant) or
+  // already transparent; despill leftover green fringe on the kept sticker pixels.
   const opaque = new Uint8Array(w * h)
-  for (let i = 0; i < w * h; i++) opaque[i] = alpha[i * 4 + 3] > ALPHA ? 1 : 0
+  const isGreen = (r: number, g: number, b: number) => g > 90 && g - r > 45 && g - b > 45
+  for (let i = 0; i < w * h; i++) {
+    const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2], a = d[i * 4 + 3]
+    if (a < 24 || isGreen(r, g, b)) {
+      d[i * 4 + 3] = 0
+    } else {
+      const cap = Math.max(r, b)
+      if (g > cap) d[i * 4 + 1] = cap // despill
+      opaque[i] = 1
+    }
+  }
+  sctx.putImageData(imgData, 0, 0)
 
   // Flood-fill label the opaque connected components (4-neighbour).
   const label = new Int32Array(w * h)
@@ -94,6 +108,10 @@ export async function segmentSheet(sheetDataUrl: string, maxOut = 6, outMax = 42
     .slice(0, maxOut)
     .sort((a, b) => a.minY - b.minY || a.minX - b.minX)
 
+  // If keying didn't separate them (e.g. the model ignored the green screen),
+  // fall back to slicing the original sheet into an even 3×2 grid.
+  if (sig.length < 4) return gridSlice(img, 3, 2, outMax)
+
   const tiles: string[] = []
   for (const k of sig) {
     const span = Math.max(k.maxX - k.minX, k.maxY - k.minY)
@@ -110,6 +128,24 @@ export async function segmentSheet(sheetDataUrl: string, maxOut = 6, outMax = 42
     out.height = Math.max(1, Math.round(bh * scale))
     out.getContext('2d')!.drawImage(src, x0, y0, bw, bh, 0, 0, out.width, out.height)
     tiles.push(out.toDataURL('image/png'))
+  }
+  return tiles
+}
+
+// Even grid slice — a robust fallback when chroma-keying can't separate stickers.
+function gridSlice(img: HTMLImageElement, cols: number, rows: number, outMax: number): string[] {
+  const cw = Math.floor(img.width / cols)
+  const ch = Math.floor(img.height / rows)
+  const tiles: string[] = []
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const scale = Math.min(1, outMax / Math.max(cw, ch))
+      const out = document.createElement('canvas')
+      out.width = Math.max(1, Math.round(cw * scale))
+      out.height = Math.max(1, Math.round(ch * scale))
+      out.getContext('2d')!.drawImage(img, c * cw, r * ch, cw, ch, 0, 0, out.width, out.height)
+      tiles.push(out.toDataURL('image/png'))
+    }
   }
   return tiles
 }
