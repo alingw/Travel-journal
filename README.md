@@ -18,11 +18,6 @@ sticker pins, handwritten notes, and drag-to-schedule.
   open + edit it with a **4-digit code**; edits autosave and sync for everyone. Setup:
   see **[SETUP-SYNC.md](SETUP-SYNC.md)** (deploy a free Vercel function once).
 
-## Watercolor map tiles (optional, free)
-Out of the box the map uses OpenStreetMap tiles with a warm hand-drawn filter (no
-key needed). For the *true* Stamen watercolor look, click **🎨 Watercolor tiles…**
-on the Map and paste a free [Stadia Maps API key](https://client.stadiamaps.com/signup/)
-(no credit card on the free tier). The key is stored locally in your browser.
 
 ## Tech
 React + TypeScript + Vite · Leaflet · @dnd-kit · Zustand + Dexie (IndexedDB) ·
