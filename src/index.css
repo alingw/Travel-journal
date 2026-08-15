@@ -918,6 +918,52 @@ select {
   border-color: var(--accent);
 }
 
+/* Debug panel */
+.btn.ghost.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.jc-debug {
+  border: 1px dashed var(--paper-line);
+  border-radius: 10px;
+  padding: 12px;
+  background: var(--paper-2);
+}
+.jc-debug-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: center;
+  font-family: var(--hand);
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  margin-bottom: 8px;
+}
+.jc-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid var(--paper-line);
+  vertical-align: -2px;
+  margin-right: 4px;
+}
+.jc-debug-sheet {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--paper-line);
+  border-radius: 6px;
+  margin: 4px 0 10px;
+  /* checkerboard so transparency vs. a painted background is obvious */
+  background-image: linear-gradient(45deg, #ccc 25%, transparent 25%),
+    linear-gradient(-45deg, #ccc 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #ccc 75%),
+    linear-gradient(-45deg, transparent 75%, #ccc 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
 .jc-tray {
   display: flex;
   align-items: center;

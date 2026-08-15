@@ -3,7 +3,8 @@ import { useJournal } from '../store/journalStore'
 import { useAssets } from '../store/assetStore'
 import type { JournalSticker } from '../types'
 import {
-  aiStickers,
+  aiStickerSheet,
+  segmentWithInfo,
   aiBackground,
   cutoutSticker,
   downscale,
@@ -11,6 +12,7 @@ import {
   backgroundStyle,
   PAPERS,
   type BgContext,
+  type SegInfo,
 } from '../services/image'
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
@@ -58,6 +60,8 @@ export function JournalCanvas({
   const [bgBusy, setBgBusy] = useState(false)
   const [note, setNote] = useState('')
   const [paperOpen, setPaperOpen] = useState(false)
+  const [debugOpen, setDebugOpen] = useState(false)
+  const [debug, setDebug] = useState<{ sheet: string; tiles: string[]; info: SegInfo } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
 
@@ -75,10 +79,17 @@ export function JournalCanvas({
       const photo = await downscale(raw, 1024, 'image/jpeg', 0.9) // shrink before upload
       let srcs: string[]
       try {
-        srcs = await aiStickers(photo)
-        setNote(`Added ${srcs.length} stickers to your library — tap one to place it.`)
+        const sheet = await aiStickerSheet(photo)
+        const { tiles, info } = await segmentWithInfo(sheet)
+        srcs = tiles
+        setDebug({ sheet, tiles, info })
+        setNote(
+          `Added ${srcs.length} stickers (${info.method}) — tap one to place it.` +
+            (info.method === 'grid' ? ' Open Debug to see the raw sheet.' : ''),
+        )
       } catch (e: any) {
         srcs = [await cutoutSticker(photo, 420)]
+        setDebug(null)
         setNote(
           e?.status === 429
             ? 'Daily AI limit reached — saved a plain cut-out to your library instead.'
@@ -195,9 +206,59 @@ export function JournalCanvas({
             </div>
           )}
         </div>
+        <button
+          className={`btn ghost ${debugOpen ? 'on' : ''}`}
+          title="Show the raw generated sheet + segmentation details"
+          onClick={() => setDebugOpen((v) => !v)}
+        >
+          🐞 Debug
+        </button>
       </div>
 
       {note && <div className="banner">{note}</div>}
+
+      {/* Debug: the raw sheet the model returned + how segmentation read it */}
+      {debugOpen && (
+        <div className="jc-section jc-debug">
+          {!debug ? (
+            <div className="tray-hint">
+              Upload a photo to capture the raw sheet here. (Nothing generated yet this session.)
+            </div>
+          ) : (
+            <>
+              <div className="jc-debug-stats">
+                <span className="u-label">Sheet {debug.info.w}×{debug.info.h}</span>
+                <span>
+                  corner{' '}
+                  <span
+                    className="jc-swatch"
+                    style={{
+                      background: `rgb(${debug.info.corner.r},${debug.info.corner.g},${debug.info.corner.b})`,
+                    }}
+                  />
+                  rgb({debug.info.corner.r},{debug.info.corner.g},{debug.info.corner.b})
+                </span>
+                <span>green {debug.info.greenPct}%</span>
+                <span>blobs {debug.info.blobs}</span>
+                <span>method {debug.info.method}</span>
+                <span>kept {debug.info.kept}</span>
+              </div>
+              <span className="u-label">Raw sheet from the model</span>
+              <img className="jc-debug-sheet" src={debug.sheet} alt="raw sheet" />
+              <span className="u-label">Segmented into {debug.tiles.length}</span>
+              <div className="jc-lib">
+                {debug.tiles.map((t, i) => (
+                  <div key={i} className="jc-lib-item">
+                    <span className="jc-lib-place" style={{ cursor: 'default' }}>
+                      <img src={t} alt="" />
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* The page */}
       <div

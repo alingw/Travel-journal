@@ -30,124 +30,178 @@ async function callImage(payload: Record<string, unknown>): Promise<string[]> {
   return urls
 }
 
-// Generate a sticker set from one photo: a single transparent sheet (one API call,
-// avoiding per-image rate limits) segmented into individual die-cut stickers here.
-export async function aiStickers(photoDataUrl: string): Promise<string[]> {
+// One API call → one sticker sheet (raw, un-segmented). Kept separate so callers
+// (and the debug view) can inspect exactly what the model returned.
+export async function aiStickerSheet(photoDataUrl: string): Promise<string> {
   const urls = await callImage({ mode: 'sticker', image: photoDataUrl })
-  const sheet = urls[0]
-  const tiles = await segmentSheet(sheet, 6)
+  return urls[0]
+}
+
+// Generate a sticker set from one photo: one sheet, segmented into stickers here.
+export async function aiStickers(photoDataUrl: string): Promise<string[]> {
+  const sheet = await aiStickerSheet(photoDataUrl)
+  const { tiles } = await segmentWithInfo(sheet)
   return tiles.length ? tiles : [await downscale(sheet, 420, 'image/png')]
 }
 
-// Split a sticker sheet into individual die-cut stickers. The sheet comes back on
-// a solid green chroma-key background; we key the green to transparent (with a mild
-// despill), find the opaque connected regions (one per sticker), and crop each to a
-// padded bounding box. Falls back to an even 3×2 grid slice if keying finds too few.
-export async function segmentSheet(sheetDataUrl: string, maxOut = 6, outMax = 420): Promise<string[]> {
-  const img = await loadImage(sheetDataUrl)
-  const w = img.width
-  const h = img.height
-  const src = document.createElement('canvas')
-  src.width = w
-  src.height = h
-  const sctx = src.getContext('2d')!
-  sctx.drawImage(img, 0, 0)
-  const imgData = sctx.getImageData(0, 0, w, h)
-  const d = imgData.data
+export interface SegInfo {
+  w: number
+  h: number
+  corner: { r: number; g: number; b: number }
+  greenPct: number // % of pixels classified as green screen
+  blobs: number // significant connected components found
+  kept: number // stickers returned
+  method: 'chroma' | 'grid'
+}
 
-  // Chroma-key: drop pixels that are green-screen (green clearly dominant) or
-  // already transparent; despill leftover green fringe on the kept sticker pixels.
-  const opaque = new Uint8Array(w * h)
-  const isGreen = (r: number, g: number, b: number) => g > 90 && g - r > 45 && g - b > 45
-  for (let i = 0; i < w * h; i++) {
-    const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2], a = d[i * 4 + 3]
-    if (a < 24 || isGreen(r, g, b)) {
-      d[i * 4 + 3] = 0
-    } else {
-      const cap = Math.max(r, b)
-      if (g > cap) d[i * 4 + 1] = cap // despill
-      opaque[i] = 1
-    }
-  }
-  sctx.putImageData(imgData, 0, 0)
+const isGreenPx = (r: number, g: number, b: number) => g > 90 && g - r > 45 && g - b > 45
 
-  // Flood-fill label the opaque connected components (4-neighbour).
-  const label = new Int32Array(w * h)
-  const stack: number[] = []
-  const comps: { minX: number; minY: number; maxX: number; maxY: number; area: number }[] = []
-  let cur = 0
-  for (let i = 0; i < w * h; i++) {
-    if (!opaque[i] || label[i]) continue
-    cur++
-    let minX = w, minY = h, maxX = 0, maxY = 0, area = 0
-    stack.push(i)
-    label[i] = cur
-    while (stack.length) {
-      const p = stack.pop()!
-      const x = p % w
-      const y = (p - x) / w
-      area++
-      if (x < minX) minX = x
-      if (x > maxX) maxX = x
-      if (y < minY) minY = y
-      if (y > maxY) maxY = y
-      if (x > 0 && opaque[p - 1] && !label[p - 1]) (label[p - 1] = cur), stack.push(p - 1)
-      if (x < w - 1 && opaque[p + 1] && !label[p + 1]) (label[p + 1] = cur), stack.push(p + 1)
-      if (y > 0 && opaque[p - w] && !label[p - w]) (label[p - w] = cur), stack.push(p - w)
-      if (y < h - 1 && opaque[p + w] && !label[p + w]) (label[p + w] = cur), stack.push(p + w)
-    }
-    comps.push({ minX, minY, maxX, maxY, area })
-  }
-
-  // Keep the significant blobs (ignore tiny specks), biggest first, then order by
-  // position (row-major) so the stickers read left-to-right, top-to-bottom.
-  const minArea = w * h * 0.004
-  const sig = comps
-    .filter((k) => k.area >= minArea)
-    .sort((a, b) => b.area - a.area)
-    .slice(0, maxOut)
-    .sort((a, b) => a.minY - b.minY || a.minX - b.minX)
-
-  // If keying didn't separate them (e.g. the model ignored the green screen),
-  // fall back to slicing the original sheet into an even 3×2 grid.
-  if (sig.length < 4) return gridSlice(img, 3, 2, outMax)
-
-  const tiles: string[] = []
-  for (const k of sig) {
-    const span = Math.max(k.maxX - k.minX, k.maxY - k.minY)
-    const pad = Math.round(span * 0.06)
-    const x0 = Math.max(0, k.minX - pad)
-    const y0 = Math.max(0, k.minY - pad)
-    const x1 = Math.min(w - 1, k.maxX + pad)
-    const y1 = Math.min(h - 1, k.maxY + pad)
-    const bw = x1 - x0 + 1
-    const bh = y1 - y0 + 1
-    const scale = Math.min(1, outMax / Math.max(bw, bh))
-    const out = document.createElement('canvas')
-    out.width = Math.max(1, Math.round(bw * scale))
-    out.height = Math.max(1, Math.round(bh * scale))
-    out.getContext('2d')!.drawImage(src, x0, y0, bw, bh, 0, 0, out.width, out.height)
-    tiles.push(out.toDataURL('image/png'))
-  }
+// Backward-compatible: return just the tiles.
+export async function segmentSheet(sheetDataUrl: string, outMax = 420): Promise<string[]> {
+  const { tiles } = await segmentWithInfo(sheetDataUrl, outMax)
   return tiles
 }
 
-// Even grid slice — a robust fallback when chroma-keying can't separate stickers.
-function gridSlice(img: HTMLImageElement, cols: number, rows: number, outMax: number): string[] {
-  const cw = Math.floor(img.width / cols)
-  const ch = Math.floor(img.height / rows)
+// Split a sticker sheet into six individual stickers — deterministically.
+// The model reliably lays the stickers out in a 3×2 grid, so we slice that grid
+// first (always six), then remove each CELL's background with a small, BOUNDED
+// per-cell flood-fill from the cell edges (no expensive whole-sheet pass). Green
+// screens key wide (clean die-cut); a plain/cream background keys tight so the
+// white borders survive. Every cell falls back to its full square if keying would
+// erase it, so you always get six separate, handleable stickers.
+export async function segmentWithInfo(
+  sheetDataUrl: string,
+  outMax = 420,
+  cols = 3,
+  rows = 2,
+): Promise<{ tiles: string[]; info: SegInfo }> {
+  const img = await loadImage(sheetDataUrl)
+  const W = img.width
+  const H = img.height
+  const cw = Math.max(1, Math.floor(W / cols))
+  const ch = Math.max(1, Math.floor(H / rows))
+
+  let cornerSample = { r: 0, g: 0, b: 0 }
+  let greenPixels = 0
+  const cellArea = cw * ch
   const tiles: string[] = []
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const scale = Math.min(1, outMax / Math.max(cw, ch))
+
+  for (let ry = 0; ry < rows; ry++) {
+    for (let cx = 0; cx < cols; cx++) {
+      const cell = document.createElement('canvas')
+      cell.width = cw
+      cell.height = ch
+      const ctx = cell.getContext('2d')!
+      ctx.drawImage(img, cx * cw, ry * ch, cw, ch, 0, 0, cw, ch)
+      const idata = ctx.getImageData(0, 0, cw, ch)
+      const d = idata.data
+      const N = cw * ch
+
+      // Background = average of this cell's four corners.
+      const cIdx = [0, cw - 1, (ch - 1) * cw, N - 1]
+      let br = 0, bg = 0, bb = 0
+      for (const p of cIdx) {
+        br += d[p * 4]
+        bg += d[p * 4 + 1]
+        bb += d[p * 4 + 2]
+      }
+      const bR = br / 4, bG = bg / 4, bB = bb / 4
+      const green = isGreenPx(bR, bG, bB)
+      if (ry === 0 && cx === 0) cornerSample = { r: Math.round(bR), g: Math.round(bG), b: Math.round(bB) }
+      const TH = green ? 120 : 12 // colour distance to treat a pixel as background
+
+      const isBg = (i: number) => {
+        if (d[i * 4 + 3] < 12) return true
+        const dr = d[i * 4] - bR, dg = d[i * 4 + 1] - bG, db = d[i * 4 + 2] - bB
+        return dr * dr + dg * dg + db * db < TH * TH
+      }
+
+      // Flood-fill the EXTERIOR background inward from the cell edges (bounded to
+      // this cell), so background enclosed inside a sticker is left intact.
+      const ext = new Uint8Array(N)
+      const stack: number[] = []
+      const seed = (x: number, y: number) => {
+        const i = y * cw + x
+        if (!ext[i] && isBg(i)) {
+          ext[i] = 1
+          stack.push(i)
+        }
+      }
+      for (let x = 0; x < cw; x++) {
+        seed(x, 0)
+        seed(x, ch - 1)
+      }
+      for (let y = 0; y < ch; y++) {
+        seed(0, y)
+        seed(cw - 1, y)
+      }
+      while (stack.length) {
+        const i = stack.pop()!
+        const x = i % cw
+        const y = (i - x) / cw
+        if (x > 0) seed(x - 1, y)
+        if (x < cw - 1) seed(x + 1, y)
+        if (y > 0) seed(x, y - 1)
+        if (y < ch - 1) seed(x, y + 1)
+      }
+
+      // Apply: exterior → transparent; despill green; measure kept bounds.
+      let minX = cw, minY = ch, maxX = -1, maxY = -1
+      for (let i = 0; i < N; i++) {
+        if (isGreenPx(d[i * 4], d[i * 4 + 1], d[i * 4 + 2])) greenPixels++
+        if (ext[i]) {
+          d[i * 4 + 3] = 0
+          continue
+        }
+        if (green) {
+          const cap = Math.max(d[i * 4], d[i * 4 + 2])
+          if (d[i * 4 + 1] > cap) d[i * 4 + 1] = cap
+        }
+        const x = i % cw
+        const y = (i - x) / cw
+        if (x < minX) minX = x
+        if (x > maxX) maxX = x
+        if (y < minY) minY = y
+        if (y > maxY) maxY = y
+      }
+
+      // If keying erased (almost) everything, keep the whole cell instead.
+      if (maxX < minX || (maxX - minX) < cw * 0.15 || (maxY - minY) < ch * 0.15) {
+        ctx.drawImage(img, cx * cw, ry * ch, cw, ch, 0, 0, cw, ch)
+        minX = 0
+        minY = 0
+        maxX = cw - 1
+        maxY = ch - 1
+      } else {
+        ctx.putImageData(idata, 0, 0)
+      }
+
+      const pad = Math.round(Math.max(maxX - minX, maxY - minY) * 0.05)
+      const x0 = Math.max(0, minX - pad)
+      const y0 = Math.max(0, minY - pad)
+      const x1 = Math.min(cw - 1, maxX + pad)
+      const y1 = Math.min(ch - 1, maxY + pad)
+      const bw = x1 - x0 + 1
+      const bh = y1 - y0 + 1
+      const scale = Math.min(1, outMax / Math.max(bw, bh))
       const out = document.createElement('canvas')
-      out.width = Math.max(1, Math.round(cw * scale))
-      out.height = Math.max(1, Math.round(ch * scale))
-      out.getContext('2d')!.drawImage(img, c * cw, r * ch, cw, ch, 0, 0, out.width, out.height)
+      out.width = Math.max(1, Math.round(bw * scale))
+      out.height = Math.max(1, Math.round(bh * scale))
+      out.getContext('2d')!.drawImage(cell, x0, y0, bw, bh, 0, 0, out.width, out.height)
       tiles.push(out.toDataURL('image/png'))
     }
   }
-  return tiles
+
+  const info: SegInfo = {
+    w: W,
+    h: H,
+    corner: cornerSample,
+    greenPct: Math.round((greenPixels / (cellArea * cols * rows)) * 100),
+    blobs: tiles.length,
+    kept: tiles.length,
+    method: isGreenPx(cornerSample.r, cornerSample.g, cornerSample.b) ? 'chroma' : 'grid',
+  }
+  return { tiles, info }
 }
 
 export async function aiBackground(context: BgContext): Promise<string> {
